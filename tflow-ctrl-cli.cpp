@@ -7,18 +7,16 @@
 #include <glib-unix.h>
 
 #include <json11.hpp>
-using namespace json11;
 
 #include "tflow-control.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
-TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, char *_srv_name)
+TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name)
 {
     app = _app;
     context = app->context;
 
-    // Create socket name from cli_name
     srv_name = std::string(_srv_name);
 
     sck_state_flag.v = Flag::UNDEF;
@@ -39,19 +37,21 @@ int TFlowCrlCli::onXXX()
 {
     return 0;
 }
+#endif
 
 int TFlowCtrlCli::onMsg()
 {
-    TFlowBuf::pck_t pck;
+    ssize_t res;
+    int err;
 
     // Read-out all data from the socket 
-    res = recv(sck_fd, &pck, MSG_NOSIGNAL);
+    res = recv(sck_fd, &in_msg, sizeof(in_msg), MSG_NOSIGNAL);
     err = errno;
 
     if (res <= 0) {
         if (err == EPIPE || err == ECONNREFUSED || err == ENOENT) {
             // May happens on Server close
-            g_warning("TFlowCtrlCli: TFlow Buffer Server closed");
+            g_warning("TFlowCtrlCli: TFlow Control Server closed");
         }
         else {
             g_warning("TFlowCtrlCli: unexpected error (%ld, %d) - %s",
@@ -63,22 +63,12 @@ int TFlowCtrlCli::onMsg()
         return -1;
     }
 
-    switch (pck.hdr.id) { 
-    case TFLOWCTRL_MSG_xxx:
-    {
-        g_debug("---TFlowCtrlCli: Received - xxx");
-        struct TFlowCtrlCli::pck_xxx *pck_xxx = (struct TFlowCtrlCli::pck_xxx*)&pck;
+    in_msg[res] = 0;
 
-        onXXX(pck_xxx);
-        break;
-    }
-    default:
-        g_warning("Oooops - Unknown message received %d", pck.hdr.id);
-    }
+    // Parse in msg to Json. Pass Json to JSONRPC
 
     return 0;
 }
-#endif
 
 gboolean tflow_ctrl_cli_dispatch(GSource* g_source, GSourceFunc callback, gpointer user_data)
 {
@@ -100,7 +90,7 @@ gboolean tflow_ctrl_cli_dispatch(GSource* g_source, GSourceFunc callback, gpoint
    
 }
 
-int TFlowCtrlCli::sendMsg(char *cmd, json11::Json::object j_params)
+int TFlowCtrlCli::sendMsg(const char *cmd, json11::Json::object j_params)
 {
     ssize_t res;
 
@@ -108,6 +98,7 @@ int TFlowCtrlCli::sendMsg(char *cmd, json11::Json::object j_params)
     
     json11::Json j_msg = json11::Json::object{
         { "cmd"    , cmd      },
+        { "dir"    , "request"},        // For better log readability only
         { "params" , j_params }
     };
 
@@ -121,13 +112,15 @@ int TFlowCtrlCli::sendMsg(char *cmd, json11::Json::object j_params)
         }
         else {
             g_warning("TFlowCtrlCli: Send message error to [%s], %s (%d) - %s",
-                srv_name, cmd, err, strerror(err));
+                srv_name.c_str(), cmd, err, strerror(err));
         }
         sck_state_flag.v = Flag::FALL;
         last_idle_check = 0; // aka Idle loop kick
         return -1;
     }
-    g_warning("TFlowCtrlCli: ->> [%s]  %s", srv_name, cmd);
+    g_warning("TFlowCtrlCli: [] ->> [%s]  %s", 
+        my_cli_name.c_str(), srv_name.c_str(), cmd);
+
     last_send_ts = clock();
     return 0;
 }
@@ -135,8 +128,8 @@ int TFlowCtrlCli::sendMsg(char *cmd, json11::Json::object j_params)
 int TFlowCtrlCli::sendSignature()
 {
     json11::Json::object j_params = { 
-        {"peer_signature" , "TFlowControl" },
-        {"pid"            ,  getpid()      },
+        {"peer_signature" ,  my_cli_name.c_str() },
+        {"pid"            ,  getpid()            },
     };
 
     sendMsg("signature", j_params);
@@ -181,6 +174,9 @@ int TFlowCtrlCli::Connect()
     std::string sock_name = std::string(TFLOWCTRLSRV_SOCKET_NAME_BASE);
 
     sock_name += srv_name;
+    std::transform(sock_name.begin(), sock_name.end(), sock_name.begin(),
+        [](unsigned char c) { return std::tolower(c); });
+
     size_t sock_name_len = sock_name.length();
 
     memcpy(sock_addr.sun_path, sock_name.c_str(), sock_name_len);  // NULL termination excluded
@@ -190,7 +186,7 @@ int TFlowCtrlCli::Connect()
     rc = connect(sck_fd, (const struct sockaddr*)&sock_addr, sck_len);
     if (rc == -1) {
         g_warning("TFlowCtrlCli: Can't connect to the Server [%s] %s (%d) - %s",
-            srv_name, sock_name.c_str(), errno, strerror(errno));
+            srv_name.c_str(), sock_name.c_str(), errno, strerror(errno));
 
         close(sck_fd);
         sck_fd = -1;

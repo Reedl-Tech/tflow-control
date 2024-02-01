@@ -8,8 +8,6 @@
 
 #include "tflow-control.h"
 
-using namespace json11;
-
 TFlowControl::TFlowControl() 
 {
     context = g_main_context_new();
@@ -18,8 +16,8 @@ TFlowControl::TFlowControl()
     main_loop = g_main_loop_new(context, false);
 
     tflow_ctrl_clis.reserve(2);
-    tflow_ctrl_clis.emplace_back("Capture");
-    tflow_ctrl_clis.emplace_back("Process");
+    tflow_ctrl_clis.emplace_back(this, (const char*)"Capture");
+    tflow_ctrl_clis.emplace_back(this, (const char*)"Process");
 }
 
 TFlowControl::~TFlowControl()

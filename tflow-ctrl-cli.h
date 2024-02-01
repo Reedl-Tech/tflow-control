@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include <glib-unix.h>
+#include <json11.hpp>
 
 #define TFLOWCTRLSRV_SOCKET_NAME_BASE "_com.reedl.tflow.ctrl-server-"   // leading '_' will be replaced in real socket name
 
@@ -11,7 +12,7 @@ class TFlowControl;
       
 class TFlowCtrlCli {
 public:
-    TFlowCtrlCli(TFlowControl* app, char *srv_name);
+    TFlowCtrlCli(TFlowControl* app, const char *srv_name);
     ~TFlowCtrlCli();
     
     TFlowControl* app;
@@ -22,7 +23,7 @@ public:
     void Disconnect();
     int onMsg();
 
-    int sendMsg(char *cmd, json11::Json::object params);
+    int sendMsg(const char *cmd, json11::Json::object params);
     int sendSignature();
 
     int sck_fd;                 // +
@@ -39,15 +40,16 @@ public:
     GSourceFuncs sck_gsfuncs;
 
 private:
+
     GMainContext* context;
 
-    std::string srv_name;                   // +
-    clock_t last_idle_check;                // +
+    std::string my_cli_name = "Control";
+
+    std::string srv_name;
+    clock_t last_idle_check;
 
     int msg_seq_num = 0;
-    int cam_fd;
-
-    class TFlowCtrlMsg msg;
+    char in_msg[4096];
 
     clock_t last_send_ts;
 
