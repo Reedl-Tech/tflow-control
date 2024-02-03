@@ -38,15 +38,20 @@
     <ClCompile Include="..\main.cpp">
       <RemoteCopyFile Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</RemoteCopyFile>
     </ClCompile>
+    <ClCompile Include="..\mongoose.c" />
     <ClCompile Include="..\tflow-control.cpp" />
     <ClCompile Include="..\tflow-ctrl-cli.cpp" />
+    <ClCompile Include="..\tflow-mg.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\mongoose.h" />
+    <ClInclude Include="..\tflow-common.h" />
     <ClInclude Include="..\tflow-control.h" />
     <ClInclude Include="..\tflow-ctrl-cli.h" />
+    <ClInclude Include="..\tflow-mg.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{cf523d96-426a-4c8d-a815-48ac585e30fc}</ProjectGuid>

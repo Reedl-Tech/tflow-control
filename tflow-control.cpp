@@ -8,7 +8,7 @@
 
 #include "tflow-control.h"
 
-TFlowControl::TFlowControl() 
+TFlowControl::TFlowControl()
 {
     context = g_main_context_new();
     g_main_context_push_thread_default(context);
@@ -18,10 +18,14 @@ TFlowControl::TFlowControl()
     tflow_ctrl_clis.reserve(2);
     tflow_ctrl_clis.emplace_back(this, (const char*)"Capture");
     tflow_ctrl_clis.emplace_back(this, (const char*)"Process");
+
+    tflow_mg = new TFlowMg(this);
 }
 
 TFlowControl::~TFlowControl()
 {
+    if (tflow_mg) delete tflow_mg;
+
     g_main_loop_unref(main_loop);
     main_loop = NULL;
 

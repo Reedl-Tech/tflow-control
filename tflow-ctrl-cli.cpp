@@ -15,7 +15,6 @@
 TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name)
 {
     app = _app;
-    context = app->context;
 
     srv_name = std::string(_srv_name);
 
@@ -45,7 +44,7 @@ int TFlowCtrlCli::onMsg()
     int err;
 
     // Read-out all data from the socket 
-    res = recv(sck_fd, &in_msg, sizeof(in_msg), MSG_NOSIGNAL);
+    res = recv(sck_fd, &in_msg, sizeof(in_msg) - 1, MSG_NOSIGNAL);
     err = errno;
 
     if (res <= 0) {
@@ -118,7 +117,7 @@ int TFlowCtrlCli::sendMsg(const char *cmd, json11::Json::object j_params)
         last_idle_check = 0; // aka Idle loop kick
         return -1;
     }
-    g_warning("TFlowCtrlCli: [] ->> [%s]  %s", 
+    g_warning("TFlowCtrlCli: [%s] ->> [%s]  %s", 
         my_cli_name.c_str(), srv_name.c_str(), cmd);
 
     last_send_ts = clock();
@@ -201,7 +200,7 @@ int TFlowCtrlCli::Connect()
     sck_src = (GSourceCli*)g_source_new(&sck_gsfuncs, sizeof(GSourceCli));
     sck_tag = g_source_add_unix_fd((GSource*)sck_src, sck_fd, (GIOCondition)(G_IO_IN /* | G_IO_ERR  | G_IO_HUP */));
     sck_src->cli = this;
-    g_source_attach((GSource*)sck_src, context);
+    g_source_attach((GSource*)sck_src, app->context);
 
     return 0;
 }

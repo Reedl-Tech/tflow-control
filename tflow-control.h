@@ -4,19 +4,10 @@
 #include <time.h>
 #include <giomm.h>
 
-class Flag {
-public:
-    enum states {
-        UNDEF,
-        CLR,
-        SET,
-        FALL,
-        RISE
-    };
-    enum states v = Flag::UNDEF;
-};
+#include "tflow-common.h"
 
 #include "tflow-ctrl-cli.h"
+#include "tflow-mg.h"
 
 class TFlowControl {
 public:
@@ -30,6 +21,7 @@ public:
     void OnIdle();
 
     std::vector<TFlowCtrlCli> tflow_ctrl_clis; 
+    TFlowMg *tflow_mg;
 private:
 
 };

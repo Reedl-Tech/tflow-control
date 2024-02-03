@@ -41,8 +41,6 @@ public:
 
 private:
 
-    GMainContext* context;
-
     std::string my_cli_name = "Control";
 
     std::string srv_name;

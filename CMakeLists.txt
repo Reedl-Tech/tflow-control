@@ -17,10 +17,15 @@ find_package(PkgConfig REQUIRED)
 # Add source to this project's executable.
 add_executable (${PROJECT_NAME}
     "main.cpp"
+    "tflow-common.h"
     "tflow-control.cpp"
     "tflow-control.h"
     "tflow-ctrl-cli.h"
     "tflow-ctrl-cli.cpp"
+    "tflow-mg.cpp"
+    "tflow-mg.h"
+    "mongoose.c"
+    "mongoose.h"
 )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
