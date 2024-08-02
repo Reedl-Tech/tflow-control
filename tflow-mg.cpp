@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 
 #include <glib-unix.h>
 
@@ -19,6 +20,9 @@ struct settings {
   long brightness;
   char *device_name;
 };
+
+static char tflow_mg_in[1024 * 1024];      // Buffer for messages from TFlowMG to MG
+static char tflow_mg_out[1024 * 1024];      // Buffer for messages from MG to TFlowMG 
 
 static struct settings s_settings = {true, 1, 57, NULL};
 
@@ -100,6 +104,51 @@ static void handle_stats_get(struct mg_connection *c) {
                 sizeof(points) / sizeof(points[0]), points);
 }
 
+void TFlowMg::_wait_and_reply_tflow_response(struct mg_connection* c, struct mg_data* my_data)
+{
+    ssize_t bytes_flush;
+    do {
+        bytes_flush = read(my_data->rd_fd, tflow_mg_in, sizeof(tflow_mg_in) - 1);
+    } while (bytes_flush == sizeof(tflow_mg_in) - 1);
+
+    // Wait for response with timeout
+    struct pollfd waiter = { .fd = my_data->rd_fd, .events = POLLIN };
+    int poll_res = poll(&waiter, 1, 3 * 1000);
+
+    switch (poll_res) {   // 1sec
+    case 0:
+        mg_http_reply(c, 408, "", "TFlow doesn't respond\n");
+        break;
+    case 1:
+        if (waiter.revents & POLLIN) {
+            ssize_t bytes_read = read(my_data->rd_fd, tflow_mg_in, sizeof(tflow_mg_in) - 1);
+            if (bytes_read < 0) {
+                mg_http_reply(c, 403, "", "Denied on read\n");
+                break;
+            }
+            tflow_mg_in[bytes_read] = '\0';
+
+            mg_http_reply(c, 200, s_json_header, "%s\n", tflow_mg_in);
+            memset(tflow_mg_in, 0, sizeof(tflow_mg_in));
+            break;
+        }
+        else if (waiter.revents & POLLERR) {
+            mg_http_reply(c, 403, "", "Denied on poll\n");
+            break;
+        }
+        else if (waiter.revents & POLLHUP) {
+            mg_http_reply(c, 403, "", "Denied - hup\n");
+            break;
+        }
+        break;
+    default:
+        mg_http_reply(c, 403, "", "Denied - X3\n");
+        break;
+    }
+
+    return;
+}
+
 void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
 {
     struct mg_data *my_data = (struct mg_data* )c->fn_data;
@@ -123,7 +172,24 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
             handle_logout(c);
         } else if (mg_http_match_uri(hm, "/api/stats/get")) {
             handle_stats_get(c);
-        } else {
+        }
+
+        else if (mg_http_match_uri(hm, "/api/playback/get")) {
+            // TODO: Add packet token
+            const char* playback_get = "{\"playback\" : {}}"; // Send empty command - set nothing and get back all current controls
+            int res = write(my_data->wr_fd, playback_get, strlen(playback_get));
+            // Wait for token sent and discard all others
+            _wait_and_reply_tflow_response(c, my_data);
+        }
+        else if (mg_http_match_uri(hm, "/api/playback/set")) {
+            int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
+            _wait_and_reply_tflow_response(c, my_data);
+        } 
+        else if (mg_http_match_uri(hm, "/api/playback/get_dir")) {
+            int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
+            _wait_and_reply_tflow_response(c, my_data);
+        }
+        else {
             // Serve static files
             struct mg_http_serve_opts opts = {.root_dir = "/home/root/web_root"};
             mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
@@ -161,13 +227,24 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
 
 }
 
-int TFlowMg::onMsg()
+int TFlowMg::sendMsgToMg(const char* component, const json11::Json::object &j_params)
+{
+    json11::Json j_msg = json11::Json::object{
+        { component , j_params }
+    };
+
+    std::string j_msg_dump = j_msg.dump();
+    write(pipe_fd_tflow2mg[1], j_msg_dump.c_str(), j_msg_dump.length() + 1);
+    return 0;
+}
+
+int TFlowMg::onMsgFromMg()
 {
     ssize_t res;
     int err;
 
     // Read-out all data from the mongoose pipe
-    res = read(pipe_fd[0], &mg_in_msg, sizeof(mg_in_msg)-1);
+    res = read(pipe_fd_mg2tflow[0], &mg_in_msg, sizeof(mg_in_msg)-1);
     err = errno;
 
     if (res <= 0) {
@@ -185,6 +262,47 @@ int TFlowMg::onMsg()
     mg_in_msg[res] = 0;
 
     // Parse input msg to Json. Pass Json to ... 
+    std::string j_err;
+    const json11::Json j_in_msg = json11::Json::parse(mg_in_msg, j_err);
+
+    if (j_in_msg.is_null()) {
+        snprintf(mg_out_msg, sizeof(mg_out_msg) - 1, "{\"X3\":\"X3\"}");
+        g_warning("TFlowMG: bad http request - %s", j_err.c_str());
+        res = write(pipe_fd_tflow2mg[1], &mg_in_msg, sizeof(mg_in_msg) - 1);
+        return 0;
+    }
+
+    auto del_me = j_in_msg.dump();
+
+    const json11::Json http_req_playback  = j_in_msg["playback"];
+    const json11::Json http_req_mvision   = j_in_msg["mvision"];
+    //const json11::Json http_req_preview   = j_in_msg["preview"];
+    //const json11::Json http_req_capture   = j_in_msg["capture"];
+    //const json11::Json http_req_recording = j_in_msg["recording"];
+
+    if (http_req_playback.is_object()) {
+        TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
+        if (cli.sck_state_flag.v != Flag::SET) {
+            // CtrlServer isn't connected
+            sendMsgToMg("playback", json11::Json::object({ { "state", "off" } }));
+            return 0;
+        }
+
+        cli.sendMsgToCtrl("player", http_req_playback.object_items());
+        // Request will be processed by a TFlowCtrlxxx module 
+    } 
+
+    if (http_req_mvision.is_object()) {
+        TFlowCtrlCli& cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
+        cli.sendMsgToCtrl("config", http_req_playback.object_items());
+    }
+
+
+    // Does Mongoose provide multiple parrallel requests at a time?
+    // If so, as we don't support real multi-user environment yet, lets block
+    // the further MG message processing until response received or timeout
+    // triggered.
+    // TODO: ^^^    
 
     return 0;
 }
@@ -197,7 +315,7 @@ gboolean tflow_mg_fifo_dispatch(GSource* g_source, GSourceFunc callback, gpointe
 
     g_info("TFlowCtrlCli: Incoming message");
 
-    rc = mg->onMsg();
+    rc = mg->onMsgFromMg();
 
     if (rc) {
         // Critical error on PIPE. 
@@ -217,8 +335,8 @@ void* TFlowMg::_thread(void* ctx)
     mg_mgr_init(&m->mgr);           // Initialise event manager
     mg_log_set(MG_LL_DEBUG);        // Set debug log level
     mg_http_listen(&m->mgr, "http://192.168.2.2:8000", m->_on_msg, (void*)&m->mg_data);
-    mg_wakeup_init(&m->mgr);  // Initialise wakeup socket pair
-    for (;;) {             // Event loop
+    mg_wakeup_init(&m->mgr);        // Initialise wakeup socket pair
+    for (;;) {                      // Event loop
         mg_mgr_poll(&m->mgr, 1000);
     }
     mg_mgr_free(&m->mgr);
@@ -228,6 +346,7 @@ void* TFlowMg::_thread(void* ctx)
 
 TFlowMg::TFlowMg(TFlowControl* _app)
 {
+    int rc;
     app = _app;
 
     pipe_tag = NULL;
@@ -236,17 +355,24 @@ TFlowMg::TFlowMg(TFlowControl* _app)
 
     last_idle_check = 0;
 
-    int rc = pipe2(pipe_fd, O_NONBLOCK);
+    rc = pipe2(pipe_fd_mg2tflow, O_NONBLOCK);
     if (rc) {
-        g_warning("TFlow error in Mongoose initiation");
+        g_warning("TFlow error in Mongoose initiation (mg2tflow)");
         return;
     }
-    mg_data.wr_fd = pipe_fd[1];
+    mg_data.wr_fd = pipe_fd_mg2tflow[1];
+
+    rc = pipe2(pipe_fd_tflow2mg, O_NONBLOCK);
+    if (rc) {
+        g_warning("TFlow error in Mongoose initiation (tflow2mg)");
+        return;
+    }
+    mg_data.rd_fd = pipe_fd_tflow2mg[0];
 
     /* Assign g_source on the socket */
     pipe_gsfuncs.dispatch = tflow_mg_fifo_dispatch;
     pipe_src = (GSourceMg*)g_source_new(&pipe_gsfuncs, sizeof(GSourceMg));
-    pipe_tag = g_source_add_unix_fd((GSource*)pipe_src, pipe_fd[0], (GIOCondition)(G_IO_IN /* | G_IO_ERR  | G_IO_HUP */));
+    pipe_tag = g_source_add_unix_fd((GSource*)pipe_src, pipe_fd_mg2tflow[0], (GIOCondition)(G_IO_IN /* | G_IO_ERR  | G_IO_HUP */));
     pipe_src->mg = this;
     g_source_attach((GSource*)pipe_src, app->context);
 
@@ -263,11 +389,11 @@ TFlowMg::TFlowMg(TFlowControl* _app)
 
 TFlowMg::~TFlowMg()
 {
-    if (pipe_fd[0] != -1) {
-        close(pipe_fd[0]);
+    if (pipe_fd_mg2tflow[0] != -1) {
+        close(pipe_fd_mg2tflow[0]);
     }
-    if (pipe_fd[1] != -1) {
-        close(pipe_fd[1]);
+    if (pipe_fd_mg2tflow[1] != -1) {
+        close(pipe_fd_mg2tflow[1]);
     }
 
     if (pipe_src) {

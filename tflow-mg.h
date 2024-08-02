@@ -2,6 +2,7 @@
 
 #include "mongoose.h"
 
+
 class TFlowControl;
 class TFlowMg {
 public:
@@ -14,9 +15,9 @@ public:
     // int Connect();
 
     //void Disconnect();
-    int onMsg();
+    int onMsgFromMg();
+    int sendMsgToMg(const char* cmd, const json11::Json::object &params);
 
-    //int sendMsg(const char* cmd, json11::Json::object params);
     //int sendSignature();
 
     // Fifo to received data from Mongoose
@@ -38,12 +39,14 @@ private:
     // Pointer stored in mg_connection.fn_data
     struct mg_data {
         char mark[4];
-        int wr_fd;         // The saem as fifo_fd[WR]
+        int wr_fd;         
+        int rd_fd;
         // Connections specific data?
         // ..
     } mg_data = {.mark = "MNG", .wr_fd = -1};
 
-    int pipe_fd[2];             // Pipe TFlow <-- Mongoose 
+    int pipe_fd_mg2tflow[2];    // Pipe TFlow <-- Mongoose 
+    int pipe_fd_tflow2mg[2];    // Pipe TFlow --> Mongoose
 
     pthread_t           th;
     pthread_cond_t      th_cond;
@@ -54,15 +57,15 @@ private:
     clock_t last_idle_check;
 
     int msg_seq_num = 0;
-    char mg_in_msg[1024];
-    char mg_out_msg[1024];
+    char mg_in_msg[1024 * 1024];   // Messages from Mongoose to CtrlCli 
+    char mg_out_msg[1024 * 1024];  // Messages from CtrlCli to Mongoose
 
     clock_t last_send_ts;
 
     static void* _thread(void* ctx);
 
     static void _on_msg(struct mg_connection* c, int ev, void* ev_data);
-   
+    static void _wait_and_reply_tflow_response(struct mg_connection* c, struct mg_data* my_data);
 
 };
 

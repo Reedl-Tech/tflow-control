@@ -8,6 +8,8 @@
 
 #include "tflow-control.h"
 
+#define  IDLE_INTERVAL_MSEC 100
+
 TFlowControl::TFlowControl()
 {
     context = g_main_context_new();
@@ -15,9 +17,12 @@ TFlowControl::TFlowControl()
     
     main_loop = g_main_loop_new(context, false);
 
-    tflow_ctrl_clis.reserve(2);
-    tflow_ctrl_clis.emplace_back(this, (const char*)"Capture");
+    // TFlowControl::SRV_NAME
+    tflow_ctrl_clis.reserve(3);
+    tflow_ctrl_clis.emplace_back(this, (const char*)"Capture"); 
     tflow_ctrl_clis.emplace_back(this, (const char*)"Process");
+    tflow_ctrl_clis.emplace_back(this, (const char*)"VStream");
+    
 
     tflow_mg = new TFlowMg(this);
 }
@@ -45,17 +50,20 @@ static gboolean tflow_control_idle(gpointer data)
 
 void TFlowControl::OnIdle()
 {
-    clock_t now = clock();
+    struct timespec now_tp;
+    clock_gettime(CLOCK_MONOTONIC, &now_tp);
 
+    // TODO: Chek inet connection 
+    //       If OK start MG server
     for (auto& cli : tflow_ctrl_clis) {
-        cli.onIdle(now);
+        cli.onIdle(&now_tp);
     }
 
 }
 
 void TFlowControl::AttachIdle()
 {
-    GSource* src_idle = g_idle_source_new();
+    GSource* src_idle = g_timeout_source_new(IDLE_INTERVAL_MSEC);
     g_source_set_callback(src_idle, (GSourceFunc)tflow_control_idle, this, nullptr);
     g_source_attach(src_idle, context);
     g_source_unref(src_idle);

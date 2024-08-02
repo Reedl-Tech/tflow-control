@@ -17,13 +17,13 @@ public:
     
     TFlowControl* app;
 
-    void onIdle(clock_t now);
+    void onIdle(struct timespec* now_tp);
     int Connect();
 
     void Disconnect();
-    int onMsg();
+    int onCtrlMsg();
 
-    int sendMsg(const char *cmd, json11::Json::object params);
+    int sendMsgToCtrl(const char *cmd, const json11::Json::object &params);
     int sendSignature();
 
     int sck_fd;                 // +
@@ -44,12 +44,15 @@ private:
     std::string my_cli_name = "Control";
 
     std::string srv_name;
-    clock_t last_idle_check;
+    struct timespec last_idle_check_tp = { 0 };
 
     int msg_seq_num = 0;
-    char in_msg[4096];
 
-    clock_t last_send_ts;
+    size_t in_msg_size;
+    char *in_msg;
 
+    struct timespec last_send_tp = { 0 };
+
+    int onCtrlMsgParse(const char* msg);
 };
 
