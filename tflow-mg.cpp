@@ -334,7 +334,7 @@ void* TFlowMg::_thread(void* ctx)
     /* Mongoose main thread */
     mg_mgr_init(&m->mgr);           // Initialise event manager
     mg_log_set(MG_LL_DEBUG);        // Set debug log level
-    mg_http_listen(&m->mgr, "http://192.168.2.2:8000", m->_on_msg, (void*)&m->mg_data);
+    mg_http_listen(&m->mgr, "http://0.0.0.0:8000", m->_on_msg, (void*)&m->mg_data);
     mg_wakeup_init(&m->mgr);        // Initialise wakeup socket pair
     for (;;) {                      // Event loop
         mg_mgr_poll(&m->mgr, 1000);

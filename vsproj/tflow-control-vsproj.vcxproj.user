@@ -6,5 +6,6 @@
     <RemoteDebuggerWorkingDirectory>/home/root/</RemoteDebuggerWorkingDirectory>
     <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
+    <RemoteTarget>985707604;av-yocto-bb (username=, port=22, authentication=Password)</RemoteTarget>
   </PropertyGroup>
 </Project>
