@@ -11,6 +11,13 @@
 
 class TFlowControl {
 public:
+    enum SRV_NAME {
+        SRV_NAME_CAPTURE = 0,
+        SRV_NAME_PROCESS = 1,
+        SRV_NAME_VSTREAM = 2,
+        NUM     = 3
+    };
+
     TFlowControl();
     ~TFlowControl();
 

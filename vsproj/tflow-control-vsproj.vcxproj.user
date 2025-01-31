@@ -6,5 +6,7 @@
     <RemoteDebuggerWorkingDirectory>/home/root/</RemoteDebuggerWorkingDirectory>
     <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
+    <AdditionalDebuggerCommands>set substitute-path /usr/src/debug/tflow-control/1.0-r0 /home/av/compulab-nxp-bsp/build-ucm-imx8m-plus/workspace/sources/tflow-control</AdditionalDebuggerCommands>
+    <RemoteGDBPath>C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\VC\Linux\bin\gdb\gdb-multiarch\gdb-multiarch.exe</RemoteGDBPath>
   </PropertyGroup>
 </Project>

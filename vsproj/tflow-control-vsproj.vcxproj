@@ -95,7 +95,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
     <ConfigurationType>Makefile</ConfigurationType>
-    <RemoteRootDir>~/imx/build-ucm-imx8m-plus/workspace-vvcam/sources/tflow-control</RemoteRootDir>
+    <RemoteRootDir>~/compulab-nxp-bsp/build-ucm-imx8m-plus/workspace/sources/tflow-control</RemoteRootDir>
     <RemoteProjectRelDir />
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -110,7 +110,7 @@
     <RemoteBuildCommandLine>pwd &amp;&amp; ./build.sh compile</RemoteBuildCommandLine>
     <RemoteCleanCommandLine>pwd &amp;&amp; ./build.sh cleanstate</RemoteCleanCommandLine>
     <RemoteBuildOutputs>../oe-workdir/tflow-control-1.0/tflow-control</RemoteBuildOutputs>
-    <NMakeIncludeSearchPath>.\;..\;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot-native\usr\include;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\blkid;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\giomm-2.4;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\gio-unix-2.0;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\glib-2.0;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\glibmm-2.4;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\gstreamer-1.0;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\libmount;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\include\sigc++-2.0;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\lib\giomm-2.4\include;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\lib\glib-2.0\include;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\lib\glibmm-2.4\include;C:\MyWorks\LKD\ucm-imx8mp-staging\recipe-sysroot\usr\lib\sigc++-2.0\include</NMakeIncludeSearchPath>
+    <NMakeIncludeSearchPath>.\;..\;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot-native\usr\include;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\blkid;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\giomm-2.4;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\gio-unix-2.0;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\glib-2.0;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\glibmm-2.4;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\gstreamer-1.0;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\libmount;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\include\sigc++-2.0;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\lib\giomm-2.4\include;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\lib\glib-2.0\include;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\lib\glibmm-2.4\include;C:\MyWorks\tflow-sdk\ucm-imx8mp-staging\recipe-sysroot\usr\lib\sigc++-2.0\include</NMakeIncludeSearchPath>
     <NMakeForcedIncludes>buildin.h;$(NMakeForcedIncludes)</NMakeForcedIncludes>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">

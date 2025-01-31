@@ -12,6 +12,29 @@
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
+static struct timespec diff_timespec(
+    const struct timespec* time1,
+    const struct timespec* time0)
+{
+    assert(time1);
+    assert(time0);
+    struct timespec diff = { .tv_sec = time1->tv_sec - time0->tv_sec, //
+        .tv_nsec = time1->tv_nsec - time0->tv_nsec };
+    if (diff.tv_nsec < 0) {
+        diff.tv_nsec += 1000000000; // nsec/sec
+        diff.tv_sec--;
+    }
+    return diff;
+}
+
+static double diff_timespec_msec(
+    const struct timespec* time1,
+    const struct timespec* time0)
+{
+    struct timespec d_tp = diff_timespec(time1, time0);
+    return d_tp.tv_sec * 1000 + (double)d_tp.tv_nsec / (1000 * 1000);
+}
+
 TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name)
 {
     app = _app;
@@ -23,12 +46,20 @@ TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name)
     sck_src = NULL;
     CLEAR(sck_gsfuncs);
 
-    last_idle_check = 0;
+    in_msg_size = 1024 * 1024;
+    in_msg = (char*)g_malloc(in_msg_size);
+
+    last_idle_check_tp = { 0 };
 }
 
 TFlowCtrlCli::~TFlowCtrlCli()
 {
     Disconnect();
+
+    if (in_msg) {
+        g_free(in_msg);
+    }
+
 }
 
 #if 0
@@ -38,16 +69,62 @@ int TFlowCrlCli::onXXX()
 }
 #endif
 
-int TFlowCtrlCli::onMsg()
+int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
+{
+    std::string j_err;
+    const json11::Json j_in_msg = json11::Json::parse(ctrl_in_msg, j_err);
+
+    if (j_in_msg.is_null()) {
+        g_warning("TFlowCtrlCli: bad ctrl response - %s", j_err.c_str());
+        return 0;
+    }
+
+    const json11::Json ctrl_resp_cmd = j_in_msg["cmd"];
+    const json11::Json ctrl_resp_dir = j_in_msg["dir"];
+    if (!ctrl_resp_cmd.is_string() || !ctrl_resp_dir.is_string()) {
+        // Sanity
+        g_warning("TFlowCtrlCli: bad ctrl response format");
+        app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "state", "error" } }));
+        return 0;
+    }
+
+    //{ "cmd"    , cmd           },
+    //{ "dir"    , "response"    },        // For better log readability only
+    //{ "err"    , resp_err      },        // Present in case of error
+    //{ "params" , j_resp_params }         // Present in case of NO error
+
+    if (0 == strcmp(ctrl_resp_cmd.string_value().c_str(), "player")) {
+        // Repack data?
+        const json11::Json ctrl_resp_err = j_in_msg["err"];
+        if (ctrl_resp_err.is_number()) {
+            // TFlowCtrl Report an error 
+            // TODO: Add text description for the error
+            app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "msg", "X3" } }));
+            return 0;
+        }
+        else {
+            const json11::Json ctrl_resp_player_params = j_in_msg["params"];
+            if (ctrl_resp_player_params.is_object()) {
+                app->tflow_mg->sendMsgToMg("playback", ctrl_resp_player_params.object_items());
+            }
+            else {
+                app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "msg", "oops" } }));
+            }
+        }
+        return 0;
+    }
+    return 0;
+}
+int TFlowCtrlCli::onCtrlMsg()
 {
     ssize_t res;
     int err;
 
     // Read-out all data from the socket 
-    res = recv(sck_fd, &in_msg, sizeof(in_msg) - 1, MSG_NOSIGNAL);
-    err = errno;
+    res = recv(sck_fd, in_msg, in_msg_size - 1, MSG_NOSIGNAL);
 
     if (res <= 0) {
+        err = errno;
         if (err == EPIPE || err == ECONNREFUSED || err == ENOENT) {
             // May happens on Server close
             g_warning("TFlowCtrlCli: TFlow Control Server closed");
@@ -58,15 +135,13 @@ int TFlowCtrlCli::onMsg()
         }
 
         sck_state_flag.v = Flag::FALL;
-        last_idle_check = 0; // aka Idle loop kick
+        //last_idle_check = 0; // aka Idle loop kick
         return -1;
     }
 
     in_msg[res] = 0;
 
-    // Parse in msg to Json. Pass Json to JSONRPC
-
-    return 0;
+    return onCtrlMsgParse(in_msg);
 }
 
 gboolean tflow_ctrl_cli_dispatch(GSource* g_source, GSourceFunc callback, gpointer user_data)
@@ -77,7 +152,7 @@ gboolean tflow_ctrl_cli_dispatch(GSource* g_source, GSourceFunc callback, gpoint
 
     g_info("TFlowCtrlCli: Incoming message");
 
-    rc = cli->onMsg();
+    rc = cli->onCtrlMsg();
 
     if (rc) {
         // Critical error on PIPE. 
@@ -89,7 +164,7 @@ gboolean tflow_ctrl_cli_dispatch(GSource* g_source, GSourceFunc callback, gpoint
    
 }
 
-int TFlowCtrlCli::sendMsg(const char *cmd, json11::Json::object j_params)
+int TFlowCtrlCli::sendMsgToCtrl(const char *cmd, const json11::Json::object &j_params)
 {
     ssize_t res;
 
@@ -114,13 +189,17 @@ int TFlowCtrlCli::sendMsg(const char *cmd, json11::Json::object j_params)
                 srv_name.c_str(), cmd, err, strerror(err));
         }
         sck_state_flag.v = Flag::FALL;
-        last_idle_check = 0; // aka Idle loop kick
+        last_idle_check_tp = { 0 }; // aka Idle loop kick - TODO: rework for "connect to idle once"
         return -1;
     }
     g_warning("TFlowCtrlCli: [%s] ->> [%s]  %s", 
         my_cli_name.c_str(), srv_name.c_str(), cmd);
 
-    last_send_ts = clock();
+    clock_gettime(CLOCK_MONOTONIC, &last_send_tp);
+    
+    // TODO: Mark pending response flag?
+    // ???
+
     return 0;
 }
 
@@ -131,7 +210,7 @@ int TFlowCtrlCli::sendSignature()
         {"pid"            ,  getpid()            },
     };
 
-    sendMsg("signature", j_params);
+    sendMsgToCtrl("signature", j_params);
     return 0;
 }
 
@@ -184,8 +263,8 @@ int TFlowCtrlCli::Connect()
     socklen_t sck_len = sizeof(sock_addr.sun_family) + sock_name_len;
     rc = connect(sck_fd, (const struct sockaddr*)&sock_addr, sck_len);
     if (rc == -1) {
-        g_warning("TFlowCtrlCli: Can't connect to the Server [%s] %s (%d) - %s",
-            srv_name.c_str(), sock_name.c_str(), errno, strerror(errno));
+        //g_warning("TFlowCtrlCli: Can't connect to the Server [%s] %s (%d) - %s",
+        //    srv_name.c_str(), sock_name.c_str(), errno, strerror(errno));
 
         close(sck_fd);
         sck_fd = -1;
@@ -205,18 +284,19 @@ int TFlowCtrlCli::Connect()
     return 0;
 }
 
-void TFlowCtrlCli::onIdle(clock_t now)
+void TFlowCtrlCli::onIdle(struct timespec* now_tp)
 {
-    clock_t dt = now - last_idle_check;
+
+    double dt = diff_timespec_msec(now_tp, &last_idle_check_tp);
 
     /* Do not check to often*/
-    if (dt < 3 * CLOCKS_PER_SEC) return;
-    last_idle_check = now;
+    if (dt < 3000) return;
+    last_idle_check_tp = *now_tp;
 
     if (sck_state_flag.v == Flag::SET || sck_state_flag.v == Flag::CLR) {
 
         // Check idle connection
-        if (last_send_ts - now > 1000) {
+        if (diff_timespec_msec(&last_send_tp, now_tp) > 1000) {
             // sendPing();
         }
         return;
