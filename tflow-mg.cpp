@@ -152,6 +152,51 @@ void TFlowMg::_wait_and_reply_tflow_response(struct mg_connection* c, struct mg_
     return;
 }
 
+void TFlowMg::_wait_and_reply_tflow_response(struct mg_connection* c, struct mg_data* my_data)
+{
+    ssize_t bytes_flush;
+    do {
+        bytes_flush = read(my_data->rd_fd, tflow_mg_in, sizeof(tflow_mg_in) - 1);
+    } while (bytes_flush == sizeof(tflow_mg_in) - 1);
+
+    // Wait for response with timeout
+    struct pollfd waiter = { .fd = my_data->rd_fd, .events = POLLIN };
+    int poll_res = poll(&waiter, 1, 3 * 1000);
+
+    switch (poll_res) {   // 1sec
+    case 0:
+        mg_http_reply(c, 408, "", "TFlow doesn't respond\n");
+        break;
+    case 1:
+        if (waiter.revents & POLLIN) {
+            ssize_t bytes_read = read(my_data->rd_fd, tflow_mg_in, sizeof(tflow_mg_in) - 1);
+            if (bytes_read < 0) {
+                mg_http_reply(c, 403, "", "Denied on read\n");
+                break;
+            }
+            tflow_mg_in[bytes_read] = '\0';
+
+            mg_http_reply(c, 200, s_json_header, "%s\n", tflow_mg_in);
+            memset(tflow_mg_in, 0, sizeof(tflow_mg_in));
+            break;
+        }
+        else if (waiter.revents & POLLERR) {
+            mg_http_reply(c, 403, "", "Denied on poll\n");
+            break;
+        }
+        else if (waiter.revents & POLLHUP) {
+            mg_http_reply(c, 403, "", "Denied - hup\n");
+            break;
+        }
+        break;
+    default:
+        mg_http_reply(c, 403, "", "Denied - X3\n");
+        break;
+    }
+
+    return;
+}
+
 void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
 {
     struct mg_data *my_data = (struct mg_data* )c->fn_data;
@@ -303,6 +348,7 @@ int TFlowMg::onMsgFromMg()
         // Request will be processed by a tflow-ctrl-capture 
     }
 
+
     if (http_req_playback.is_object()) {
         TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
         if (cli.sck_state_flag.v != Flag::SET) {
@@ -312,7 +358,6 @@ int TFlowMg::onMsgFromMg()
         }
 
         cli.sendMsgToCtrl("player", http_req_playback.object_items());
-        // Request will be processed by a tflow-ctrl-process module 
     } 
 
     if (http_req_mvision.is_object()) {
