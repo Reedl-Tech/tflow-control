@@ -60,3 +60,4 @@ target_link_libraries(${PROJECT_NAME} PkgConfig::GLIBMM)
 
 target_link_libraries(${PROJECT_NAME} -lrt)
 
+install(TARGETS tflow-control DESTINATION bin)

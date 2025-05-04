@@ -278,9 +278,7 @@ int TFlowMg::onMsgFromMg()
     const json11::Json &http_req_mv_cfg     = j_in_msg["mv_cfg"];
     const json11::Json &http_req_mv_algo    = j_in_msg["mv_algo"];
 
-    const json11::Json &http_req_preview    = j_in_msg["preview"];
     const json11::Json &http_req_capture    = j_in_msg["capture"];
-    //const json11::Json &http_req_recording = j_in_msg["recording"];
 
     const std::string &api_name = j_in_msg.object_items().begin()->first;
 
@@ -320,66 +318,6 @@ int TFlowMg::onMsgFromMg()
         cli.sendMsgToCtrl(api_name.c_str(), j_in_msg.object_items().begin()->second.object_items());
     }
 
-#if 0
-    if (http_req_preview.is_object()) {
-
-        TFlowCtrlCli &cli_process = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
-        TFlowCtrlCli& cli_vstream = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_VSTREAM);
-
-        const json11::Json j_preview = http_req_preview.object_items();
-        auto j_xz = http_req_preview.object_items().find("video_source");
-
-        const std::string &video_src = j_preview["video_source"].is_string() ? 
-            j_preview["video_source"].string_value() : "";
-
-        const std::string& preview_src = j_preview["preview_source"].is_string() ?
-            j_preview["preview_source"].string_value() : "";
-
-
-        // Preview configuration from UI causes control for several modules
-        // and thus request to each 
-        json11::Json::object j_process_preview = {};
-        if (0 == strcmp("capture", preview_src.c_str())) {
-            // Raw preview from Capture not supported so far
-            j_process_preview.emplace("preview_source", "capture");
-        }
-        else if (0 == strcmp("mvision", preview_src.c_str())) {
-            j_process_preview.emplace("video_src", video_src.c_str());
-
-        }
-        cli_process.sendMsgToCtrl("config", j_process_preview);
-    }
-
-    if (http_req_mv_cfg.is_object()) {
-
-        TFlowCtrlCli& cli_process = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
-
-        const json11::Json j_mv_cfg = http_req_mv_cfg.object_items();
-        json11::Json::object j_process_config = {};
-
-        //auto j_video_src = http_req_preview.object_items().find("video_source");
-        //if (j_video_src != http_req_preview.object_items().end() && 
-        //    j_video_src->second.is_string()) {
-        //    const std::string &del_me = j_video_src->second.string_value();
-        //    j_process_config.emplace("video_source", j_video_src->second.string_value());
-        //}
-        // ^^^ Probably a bit faster, but hard to read. We don't care much on 
-        // performance during configuration, so let's keep it tidy.
-
-        if (j_mv_cfg["video_source"].is_string()) {
-            j_process_config.emplace("video_source", j_mv_cfg["video_source"].string_value());
-        }
-
-        if (j_mv_cfg["opencl"].is_number()) {
-            j_process_config.emplace("opencl", j_mv_cfg["opencl"].int_value());
-        }
-
-        cli_process.sendMsgToCtrl("config", j_process_config);
-        return 0;
-    }
-#endif
-
-    
     // Does Mongoose provide multiple parrallel requests at a time?
     // If so, as we don't support real multi-user environment yet, lets block
     // the further MG message processing until response received or timeout
