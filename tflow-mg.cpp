@@ -164,31 +164,33 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
             mg_ws_upgrade(c, hm, NULL);  // Upgrade HTTP to Websocket
             c->data[0] = 'W';            // Set some unique mark on a connection
         }
+#if 0
         else if (mg_http_match_uri(hm, "/api/#") && u == NULL) {
             mg_http_reply(c, 403, "", "Not Authorised\n");
         } else if (mg_http_match_uri(hm, "/api/login")) {
             handle_login(c, u);
         } else if (mg_http_match_uri(hm, "/api/logout")) {
             handle_logout(c);
-        } else if (mg_http_match_uri(hm, "/api/stats/get")) {
+        }
+#endif
+        else if (mg_http_match_uri(hm, "/api/stats/get")) {
             handle_stats_get(c);
         }
-
-        else if (mg_http_match_uri(hm, "/api/playback/get")) {
-            // TODO: Add packet token
-            const char* playback_get = "{\"playback\" : {}}"; // Send empty command - set nothing and get back all current controls
-            int res = write(my_data->wr_fd, playback_get, strlen(playback_get));
-            // Wait for token sent and discard all others
-            _wait_and_reply_tflow_response(c, my_data);
-        }
-        else if (mg_http_match_uri(hm, "/api/playback/set")) {
+        else if ( /* API calls */
+            mg_http_match_uri(hm, "/api/capture/get")  ||
+            mg_http_match_uri(hm, "/api/capture/set")  ||
+            mg_http_match_uri(hm, "/api/preview/get")  ||
+            mg_http_match_uri(hm, "/api/preview/set")  ||
+            mg_http_match_uri(hm, "/api/mvision/get")  ||
+            mg_http_match_uri(hm, "/api/mvision/set")  ||
+            mg_http_match_uri(hm, "/api/playback/get") ||
+            mg_http_match_uri(hm, "/api/playback/set") ||
+            mg_http_match_uri(hm, "/api/playback/get") ||
+            mg_http_match_uri(hm, "/api/playback/get_dir" )) {
+            
             int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
             _wait_and_reply_tflow_response(c, my_data);
         } 
-        else if (mg_http_match_uri(hm, "/api/playback/get_dir")) {
-            int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
-            _wait_and_reply_tflow_response(c, my_data);
-        }
         else {
             // Serve static files
             struct mg_http_serve_opts opts = {.root_dir = "/home/root/web_root"};
@@ -227,11 +229,9 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
 
 }
 
-int TFlowMg::sendMsgToMg(const char* component, const json11::Json::object &j_params)
+int TFlowMg::sendMsgToMg(const json11::Json::object &j_params)
 {
-    json11::Json j_msg = json11::Json::object{
-        { component , j_params }
-    };
+    json11::Json j_msg = j_params;
 
     std::string j_msg_dump = j_msg.dump();
     write(pipe_fd_tflow2mg[1], j_msg_dump.c_str(), j_msg_dump.length() + 1);
@@ -255,13 +255,12 @@ int TFlowMg::onMsgFromMg()
             g_warning("TFlowMg: unexpected error (%ld, %d) - %s",
                 res, err, strerror(err));
         }
-
         return -1;
     }
 
     mg_in_msg[res] = 0;
 
-    // Parse input msg to Json. Pass Json to ... 
+    // Parse input msg to Json. Pass Json to an approriated module
     std::string j_err;
     const json11::Json j_in_msg = json11::Json::parse(mg_in_msg, j_err);
 
@@ -274,30 +273,113 @@ int TFlowMg::onMsgFromMg()
 
     auto del_me = j_in_msg.dump();
 
-    const json11::Json http_req_playback  = j_in_msg["playback"];
-    const json11::Json http_req_mvision   = j_in_msg["mvision"];
-    //const json11::Json http_req_preview   = j_in_msg["preview"];
-    //const json11::Json http_req_capture   = j_in_msg["capture"];
-    //const json11::Json http_req_recording = j_in_msg["recording"];
+    const json11::Json &http_req_player_dir = j_in_msg["player_dir"];
+    const json11::Json &http_req_player     = j_in_msg["player"];
+    const json11::Json &http_req_mv_cfg     = j_in_msg["mv_cfg"];
+    const json11::Json &http_req_mv_algo    = j_in_msg["mv_algo"];
 
-    if (http_req_playback.is_object()) {
+    const json11::Json &http_req_preview    = j_in_msg["preview"];
+    const json11::Json &http_req_capture    = j_in_msg["capture"];
+    //const json11::Json &http_req_recording = j_in_msg["recording"];
+
+    const std::string &api_name = j_in_msg.object_items().begin()->first;
+
+    if (http_req_player_dir.is_object() ||
+        http_req_player.is_object()     ||
+        http_req_mv_algo.is_object()    ||
+        http_req_mv_cfg.is_object() ) {
+        
+        // Check TFlow Process module is online 
+        // Player is a part of tflow-process so far.
         TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
         if (cli.sck_state_flag.v != Flag::SET) {
-            // CtrlServer isn't connected
-            sendMsgToMg("playback", json11::Json::object({ { "state", "off" } }));
+            // CtrlServerProcess isn't connected
+            sendMsgToMg( json11::Json::object({
+                { api_name.c_str(),
+                    json11::Json::object({ { "state", "off" } } )
+                } }));
             return 0;
         }
 
-        cli.sendMsgToCtrl("player", http_req_playback.object_items());
-        // Request will be processed by a TFlowCtrlxxx module 
+        cli.sendMsgToCtrl(api_name.c_str(), j_in_msg.object_items().begin()->second.object_items());
     } 
 
-    if (http_req_mvision.is_object()) {
-        TFlowCtrlCli& cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
-        cli.sendMsgToCtrl("config", http_req_playback.object_items());
+    if (http_req_capture.is_object()) {
+        // Check TFlow Capture module is online 
+        
+        TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_CAPTURE);
+        if (cli.sck_state_flag.v != Flag::SET) {
+            // CtrlServerCapture isn't connected
+            sendMsgToMg( json11::Json::object({
+                { api_name.c_str(),
+                    json11::Json::object({ { "state", "off" } } )
+                } }));
+            return 0;
+        }
+
+        cli.sendMsgToCtrl(api_name.c_str(), j_in_msg.object_items().begin()->second.object_items());
     }
 
+#if 0
+    if (http_req_preview.is_object()) {
 
+        TFlowCtrlCli &cli_process = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
+        TFlowCtrlCli& cli_vstream = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_VSTREAM);
+
+        const json11::Json j_preview = http_req_preview.object_items();
+        auto j_xz = http_req_preview.object_items().find("video_source");
+
+        const std::string &video_src = j_preview["video_source"].is_string() ? 
+            j_preview["video_source"].string_value() : "";
+
+        const std::string& preview_src = j_preview["preview_source"].is_string() ?
+            j_preview["preview_source"].string_value() : "";
+
+
+        // Preview configuration from UI causes control for several modules
+        // and thus request to each 
+        json11::Json::object j_process_preview = {};
+        if (0 == strcmp("capture", preview_src.c_str())) {
+            // Raw preview from Capture not supported so far
+            j_process_preview.emplace("preview_source", "capture");
+        }
+        else if (0 == strcmp("mvision", preview_src.c_str())) {
+            j_process_preview.emplace("video_src", video_src.c_str());
+
+        }
+        cli_process.sendMsgToCtrl("config", j_process_preview);
+    }
+
+    if (http_req_mv_cfg.is_object()) {
+
+        TFlowCtrlCli& cli_process = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
+
+        const json11::Json j_mv_cfg = http_req_mv_cfg.object_items();
+        json11::Json::object j_process_config = {};
+
+        //auto j_video_src = http_req_preview.object_items().find("video_source");
+        //if (j_video_src != http_req_preview.object_items().end() && 
+        //    j_video_src->second.is_string()) {
+        //    const std::string &del_me = j_video_src->second.string_value();
+        //    j_process_config.emplace("video_source", j_video_src->second.string_value());
+        //}
+        // ^^^ Probably a bit faster, but hard to read. We don't care much on 
+        // performance during configuration, so let's keep it tidy.
+
+        if (j_mv_cfg["video_source"].is_string()) {
+            j_process_config.emplace("video_source", j_mv_cfg["video_source"].string_value());
+        }
+
+        if (j_mv_cfg["opencl"].is_number()) {
+            j_process_config.emplace("opencl", j_mv_cfg["opencl"].int_value());
+        }
+
+        cli_process.sendMsgToCtrl("config", j_process_config);
+        return 0;
+    }
+#endif
+
+    
     // Does Mongoose provide multiple parrallel requests at a time?
     // If so, as we don't support real multi-user environment yet, lets block
     // the further MG message processing until response received or timeout

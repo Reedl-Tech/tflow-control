@@ -80,41 +80,48 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
     }
 
     const json11::Json ctrl_resp_cmd = j_in_msg["cmd"];
-    const json11::Json ctrl_resp_dir = j_in_msg["dir"];
-    if (!ctrl_resp_cmd.is_string() || !ctrl_resp_dir.is_string()) {
-        // Sanity
-        g_warning("TFlowCtrlCli: bad ctrl response format");
-        app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "state", "error" } }));
+
+    //{ "cmd"     , cmd           },
+    //{ "dir"     , "response"    },        // For better log readability only
+    //{ "err"     , resp_err_int  },        // Present in case of error
+    //{ "err_msg" , resp_err_str  },        // Present in case of error
+    //{ "params"  , j_resp_params }         // Present in case of NO error
+
+    if (!ctrl_resp_cmd.is_string()) {
+        //app->tflow_mg->sendMsgToMg(...);
         return 0;
     }
 
-    //{ "cmd"    , cmd           },
-    //{ "dir"    , "response"    },        // For better log readability only
-    //{ "err"    , resp_err      },        // Present in case of error
-    //{ "params" , j_resp_params }         // Present in case of NO error
+    const json11::Json ctrl_resp_err = j_in_msg["err"];
+    const json11::Json ctrl_resp_err_msg = j_in_msg["err_msg"];
 
-    if (0 == strcmp(ctrl_resp_cmd.string_value().c_str(), "player")) {
-        // Repack data?
-        const json11::Json ctrl_resp_err = j_in_msg["err"];
-        if (ctrl_resp_err.is_number()) {
-            // TFlowCtrl Report an error 
-            // TODO: Add text description for the error
-            app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "msg", "X3" } }));
-            return 0;
-        }
-        else {
-            const json11::Json ctrl_resp_player_params = j_in_msg["params"];
-            if (ctrl_resp_player_params.is_object()) {
-                app->tflow_mg->sendMsgToMg("playback", ctrl_resp_player_params.object_items());
-            }
-            else {
-                app->tflow_mg->sendMsgToMg("playback", json11::Json::object({ { "msg", "oops" } }));
-            }
-        }
+    if (ctrl_resp_err.is_number()) {
+        // TFlowCtrlServer Report an error 
+        // { "cmd" : { "err" : <code> , "err_msg", "some error text" } }
+
+        app->tflow_mg->sendMsgToMg(json11::Json::object({ {
+                ctrl_resp_cmd.string_value().c_str(),
+                json11::Json::object({
+                    { "err", ctrl_resp_err.int_value() },
+                    { "err_msg", ctrl_resp_err_msg.is_string() ? 
+                        ctrl_resp_err_msg.string_value() : "unknown" } })
+                } })
+        );
         return 0;
+    }
+    else {
+        // All good - repack as {"cmd" : { params } }
+        const json11::Json ctrl_resp_player_params = j_in_msg["params"];
+        if (ctrl_resp_player_params.is_object()) {
+
+            app->tflow_mg->sendMsgToMg(json11::Json::object({ {
+                ctrl_resp_cmd.string_value().c_str(),
+                    ctrl_resp_player_params } } ));
+        }
     }
     return 0;
 }
+
 int TFlowCtrlCli::onCtrlMsg()
 {
     ssize_t res;

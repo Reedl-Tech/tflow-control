@@ -53,6 +53,9 @@
     <ClInclude Include="..\tflow-ctrl-cli.h" />
     <ClInclude Include="..\tflow-mg.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="build.sh" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{cf523d96-426a-4c8d-a815-48ac585e30fc}</ProjectGuid>
     <Keyword>Linux</Keyword>
@@ -95,7 +98,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
     <ConfigurationType>Makefile</ConfigurationType>
-    <RemoteRootDir>~/imx/build-ucm-imx8m-plus/workspace-vvcam/sources/tflow-control</RemoteRootDir>
+    <RemoteRootDir>~/compulab-nxp-bsp/build-ucm-imx8m-plus/workspace/sources/tflow-control</RemoteRootDir>
     <RemoteProjectRelDir />
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -115,7 +118,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <PostBuildEvent>
-      <Command>pscp $(OutDir)tflow-control root@ucm-imx8m-plus:/home/root</Command>
+      <Command>pscp $(OutDir)tflow-control root@bubo-bubo-001:/home/root</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

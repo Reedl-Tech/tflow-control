@@ -16,7 +16,7 @@ public:
 
     //void Disconnect();
     int onMsgFromMg();
-    int sendMsgToMg(const char* cmd, const json11::Json::object &params);
+    int sendMsgToMg(const json11::Json::object &params);
 
     //int sendSignature();
 

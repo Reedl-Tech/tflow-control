@@ -1,11 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <RemoteDebuggingTarget>-1531535385;ucm-imx8m-plus (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
+    <RemoteDebuggingTarget>-1369655913;bubo-bubo-001 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
     <RemoteDebuggerCommand>/home/root/tflow-control</RemoteDebuggerCommand>
     <RemoteDebuggerWorkingDirectory>/home/root/</RemoteDebuggerWorkingDirectory>
     <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
-    <RemoteTarget>985707604;av-yocto-bb (username=, port=22, authentication=Password)</RemoteTarget>
+    <RemoteTarget>-1717057199;av-mickledore-bb (username=, port=22, authentication=Password)</RemoteTarget>
+    <AdditionalDebuggerCommands>set substitute-path /usr/src/debug/tflow-control/1.0-r0 /home/av/compulab-nxp-bsp/build-ucm-imx8m-plus/workspace/sources/tflow-control</AdditionalDebuggerCommands>
   </PropertyGroup>
 </Project>
