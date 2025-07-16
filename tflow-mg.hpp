@@ -15,8 +15,9 @@ public:
     // int Connect();
 
     //void Disconnect();
+    int onRequest(const json11::Json &j_msg);
     int onMsgFromMg();
-    int sendMsgToMg(const json11::Json::object &params);
+    int sendMsgToMg(const json11::Json::object &msg);
 
     //int sendSignature();
 

@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cassert>
+#include <unordered_map>
 #include <time.h>
 #include <giomm.h>
 
-#include "tflow-common.h"
-
-#include "tflow-ctrl-cli.h"
-#include "tflow-mg.h"
+#include "tflow-common.hpp"
+#include "tflow-ctrl-cli.hpp"
+#include "tflow-mg.hpp"
 
 class TFlowControl {
 public:
@@ -29,7 +29,11 @@ public:
 
     std::vector<TFlowCtrlCli> tflow_ctrl_clis; 
     TFlowMg *tflow_mg;
+
+    std::unordered_map<std::string, int> config_ids;
 private:
 
+
+    
 };
 

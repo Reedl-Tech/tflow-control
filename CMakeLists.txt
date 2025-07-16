@@ -17,13 +17,13 @@ find_package(PkgConfig REQUIRED)
 # Add source to this project's executable.
 add_executable (${PROJECT_NAME}
     "main.cpp"
-    "tflow-common.h"
+    "tflow-common.hpp"
     "tflow-control.cpp"
-    "tflow-control.h"
-    "tflow-ctrl-cli.h"
+    "tflow-control.hpp"
+    "tflow-ctrl-cli.hpp"
     "tflow-ctrl-cli.cpp"
     "tflow-mg.cpp"
-    "tflow-mg.h"
+    "tflow-mg.hpp"
     "mongoose.c"
     "mongoose.h"
 )

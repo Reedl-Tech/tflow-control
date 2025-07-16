@@ -13,6 +13,7 @@ class TFlowControl;
 class TFlowCtrlCli {
 public:
     TFlowCtrlCli(TFlowControl* app, const char *srv_name);
+
     ~TFlowCtrlCli();
     
     TFlowControl* app;
@@ -54,5 +55,10 @@ private:
     struct timespec last_send_tp = { 0 };
 
     int onCtrlMsgParse(const char* msg);
+
+    // Parent module callback;
+    std::function<void(TFlowCtrlCli *cli, const char *cmd, 
+        const json11::Json &ctrl_resp_params)> ctrl_onRespMsg;
+
 };
 

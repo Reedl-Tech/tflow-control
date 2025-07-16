@@ -6,8 +6,8 @@
 
 #include <json11.hpp>
 
-#include "tflow-control.h"
-#include "tflow-mg.h"
+#include "tflow-control.hpp"
+#include "tflow-mg.hpp"
 
 struct user {
   const char *name, *pass, *access_token;
@@ -176,19 +176,13 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
         else if (mg_http_match_uri(hm, "/api/stats/get")) {
             handle_stats_get(c);
         }
-        else if ( /* API calls */
-            mg_http_match_uri(hm, "/api/capture/get")  ||
-            mg_http_match_uri(hm, "/api/capture/set")  ||
-            mg_http_match_uri(hm, "/api/preview/get")  ||
-            mg_http_match_uri(hm, "/api/preview/set")  ||
-            mg_http_match_uri(hm, "/api/mvision/get")  ||
-            mg_http_match_uri(hm, "/api/mvision/set")  ||
-            mg_http_match_uri(hm, "/api/playback/get") ||
-            mg_http_match_uri(hm, "/api/playback/set") ||
-            mg_http_match_uri(hm, "/api/playback/get") ||
-            mg_http_match_uri(hm, "/api/playback/get_dir" )) {
+        else if ( mg_http_match_uri(hm, "/api") ) {
             
             int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
+#if CODE_BROWSE
+            tflow_mg_fifo_dispatch();
+                TFlowMg::onMsgFromMg();
+#endif
             _wait_and_reply_tflow_response(c, my_data);
         } 
         else {
@@ -228,6 +222,75 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
     }
 
 }
+
+int TFlowMg::onRequest(const json11::Json &j_msg)
+{
+    json11::Json::object j_modules;
+
+    for (int i = 0; i < app->tflow_ctrl_clis.size(); i++) {
+        TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(i);
+
+        json11::Json::object j_mod_params;
+
+        if (cli.sck_state_flag.v == Flag::SET) {
+            j_mod_params.emplace("state", "ok");
+        }
+        else {
+            j_mod_params.emplace("state", "off");
+        }
+    
+        std::unordered_map<std::string, int>::iterator it_cfg_id;
+
+        switch (i) {
+        case TFlowControl::SRV_NAME_CAPTURE: {
+            it_cfg_id = app->config_ids.find("capture");
+            if (it_cfg_id != app->config_ids.end()) {
+                j_mod_params.emplace("config_id", it_cfg_id->second);
+            }
+            j_modules.emplace("capture", j_mod_params);
+            break;
+        }
+        case TFlowControl::SRV_NAME_PROCESS:
+            it_cfg_id = app->config_ids.find("mvision");
+            if (it_cfg_id != app->config_ids.end()) {
+                j_mod_params.emplace("config_id", it_cfg_id->second);
+            }
+            j_modules.emplace( "mvision", j_mod_params);
+            break;
+        case TFlowControl::SRV_NAME_VSTREAM:
+            it_cfg_id = app->config_ids.find("recording");
+            if (it_cfg_id != app->config_ids.end()) {
+                j_mod_params.emplace("config_id", it_cfg_id->second);
+            }
+            j_modules.emplace( "recording", j_mod_params);
+
+            it_cfg_id = app->config_ids.find("streaming");
+            if (it_cfg_id != app->config_ids.end()) {
+                j_mod_params.emplace("config_id", it_cfg_id->second);
+            }
+            j_modules.emplace( "streaming", j_mod_params);
+            break;
+        default:
+            assert(0);
+        }
+
+    }
+    
+    //{ "control" : {
+    //        "capture"  : { "config_id" : 1 }, 
+    //        "mvision"  : { "config_id" : 2 }
+    //        "streamer" : { "config_id" : 3 }
+    //        "recorder" : { "config_id" : 4 }
+    //    }
+    //}
+
+    //const json11::Json::object j_control({ 
+    //    { "control", j_modules } });
+
+    sendMsgToMg(json11::Json::object({ { "control", j_modules } }));
+    return 0;
+}
+
 
 int TFlowMg::sendMsgToMg(const json11::Json::object &j_params)
 {
@@ -273,49 +336,187 @@ int TFlowMg::onMsgFromMg()
 
     auto del_me = j_in_msg.dump();
 
+    const json11::Json &http_req_control    = j_in_msg["control"];
+    const json11::Json &http_req_capture    = j_in_msg["capture"];
+    const json11::Json &http_req_mvision    = j_in_msg["mvision"];
     const json11::Json &http_req_player_dir = j_in_msg["player_dir"];
     const json11::Json &http_req_player     = j_in_msg["player"];
-    const json11::Json &http_req_mv_cfg     = j_in_msg["mv_cfg"];
-    const json11::Json &http_req_mv_algo    = j_in_msg["mv_algo"];
+    const json11::Json &http_req_streaming  = j_in_msg["streaming"];
+    const json11::Json &http_req_recording  = j_in_msg["recording"];
 
-    const json11::Json &http_req_capture    = j_in_msg["capture"];
+    const std::string &module_name = j_in_msg.object_items().begin()->first;
 
-    const std::string &api_name = j_in_msg.object_items().begin()->first;
-
-    if (http_req_player_dir.is_object() ||
-        http_req_player.is_object()     ||
-        http_req_mv_algo.is_object()    ||
-        http_req_mv_cfg.is_object() ) {
+    if (http_req_control.is_object()) {
+        onRequest(http_req_control);
+        return 0;
+    }
+    if (http_req_mvision.is_object()) {
         
         // Check TFlow Process module is online 
         // Player is a part of tflow-process so far.
         TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
         if (cli.sck_state_flag.v != Flag::SET) {
             // CtrlServerProcess isn't connected
-            sendMsgToMg( json11::Json::object({
-                { api_name.c_str(),
-                    json11::Json::object({ { "state", "off" } } )
+            sendMsgToMg( json11::Json::object( {
+                { module_name.c_str(),
+                    json11::Json::object({ { "state", "off" } })
                 } }));
             return 0;
         }
 
-        cli.sendMsgToCtrl(api_name.c_str(), j_in_msg.object_items().begin()->second.object_items());
+        if (http_req_mvision.object_items().empty()) {
+            // Empty request - the module will respond with controls
+            json11::Json j_dummy;
+            cli.sendMsgToCtrl("controls", j_dummy.object_items());
+        }
+        else {
+            // Strip modules name. For ex.: 
+            // {"mvision" : { "config" : {  params } } } ==> { "config" : {  params } } 
+            // j_cmd = { "config" : {  params } } 
+            const json11::Json &j_cmd = http_req_mvision.object_items().begin()->second;
+            const std::string &cmd_name = http_req_mvision.object_items().begin()->first;
+
+            auto del_me = j_cmd.dump();
+
+            // Command parametr(s) are always object
+            if (!j_cmd.is_object()) {
+                g_critical("TFlowCtrlCli: Bad incoming message format");
+                return 0;   // Bad format
+            }
+
+            cli.sendMsgToCtrl(cmd_name.c_str(), j_cmd.object_items());   
+        }
+    } 
+
+    if (http_req_player_dir.is_object() ||
+        http_req_player.is_object()) {
+        
+        // Player is a part of tflow-process so far, thus check TFlow Process 
+        // module is online.
+
+         // IN from UI:      {"player(_dir)" : { params } }
+         // OUT to Process:  {"cmd" : "player(_dir)", "dir" : "request", "params" : { params }} }
+
+        TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_PROCESS);
+        if (cli.sck_state_flag.v != Flag::SET) {
+            // CtrlServerProcess isn't connected
+            sendMsgToMg( json11::Json::object({
+                { module_name.c_str(),
+                    json11::Json::object({ { "state", "off" } } )
+                } }));
+            return 0;
+        }
+        const json11::Json &j_cmd = 
+            http_req_player.is_object()     ? http_req_player :
+            http_req_player_dir.is_object() ? http_req_player_dir: 
+            json11::Json();
+
+        auto del_me = j_cmd.dump();
+
+        const char *cmd_name = 
+            http_req_player.is_object() ? "player" :
+            http_req_player_dir.is_object() ? "player_dir" :
+            nullptr;
+
+        // Split command object into "name" and "params"
+        const json11::Json::object &cmd_params = j_cmd.object_items();
+
+        cli.sendMsgToCtrl(cmd_name, cmd_params);   
     } 
 
     if (http_req_capture.is_object()) {
-        // Check TFlow Capture module is online 
         
+        // Capture request received. For ex.: { "capture" : { "config" : {  params } } }
+        // 
+        // In form UI: {"capture" : { "config" : {  params } } }
+        // Out to Capture: {"cmd" : "config", "dir" : "request", "params" : { params }} }							
+
+        // Get Capture related TFlowControl client by array index and check 
+        // TFlow Capture module is online.
+
         TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_CAPTURE);
         if (cli.sck_state_flag.v != Flag::SET) {
             // CtrlServerCapture isn't connected
             sendMsgToMg( json11::Json::object({
-                { api_name.c_str(),
-                    json11::Json::object({ { "state", "off" } } )
+                { module_name.c_str(),
+                    json11::Json::object({ { "state", "off" } })
                 } }));
             return 0;
         }
 
-        cli.sendMsgToCtrl(api_name.c_str(), j_in_msg.object_items().begin()->second.object_items());
+        if (http_req_capture.object_items().empty()) {
+            g_critical("TFlowCtrlCli: Bad incoming message format");
+            return 0;
+        }
+
+        // Strip modules name - j_cmd = { "config" : {  params } } 
+        const json11::Json &j_cmd = http_req_capture.object_items().begin()->second;
+        const std::string &cmd_name = http_req_capture.object_items().begin()->first;
+
+        auto del_me = j_cmd.dump();
+
+        // Command parametr(s) are always object
+        if (!j_cmd.is_object()) {
+            g_critical("TFlowCtrlCli: Bad incoming message format");
+            return 0;   // Bad format
+        }
+
+        cli.sendMsgToCtrl(cmd_name.c_str(), j_cmd.object_items());   
+    }
+
+    if (http_req_streaming.is_object() || 
+        http_req_recording.is_object()) {
+        
+        // Streaming and Recording occupy the same TFlow module - VStream.
+        // So, lets distinguish commands by adding the suffix to a command.
+
+        // IN from WEB : {"recording" : { "config" : {  params } } }
+        // Out to VStream {"cmd" : "recording_config" , "dir": "request", "params" : { params }} }							
+
+        // IN from WEB : {"streaming" : { "config" : {  params } } }
+        // Out to VStream {"cmd" : "streaming_config" , "dir": "request", "params" : { params }} }							
+
+        // Get VStream related TFlowControl client by array index and check 
+        // TFlow Capture module is online.
+
+        TFlowCtrlCli &cli = app->tflow_ctrl_clis.at(TFlowControl::SRV_NAME_VSTREAM);
+        if (cli.sck_state_flag.v != Flag::SET) {
+            // CtrlServerVStream isn't connected
+            sendMsgToMg( json11::Json::object ({
+                { module_name.c_str(),
+                    json11::Json::object({ { "state", "off" } })
+                } }));
+            return 0;
+        }
+
+        const json11::Json &j_cmd = 
+            http_req_streaming.is_object() ? http_req_streaming :
+            http_req_recording.is_object() ? http_req_recording : 
+            json11::Json();
+
+        std::string cmd_suffix = 
+            http_req_streaming.is_object() ? "streaming_" :
+            http_req_recording.is_object() ? "recording_" :
+            std::string();
+
+        if (http_req_streaming.object_items().empty()) {
+            // Empty request - the module will respond with controls
+            json11::Json j_dummy;
+            cli.sendMsgToCtrl(cmd_suffix.append("controls").c_str(), j_dummy.object_items());
+        }
+        else {
+            // Strip modules name. For ex.: { "config" : {  params } }
+            const json11::Json &j_cmd = http_req_streaming.object_items().begin()->second;
+            // Command parametr(s) are always object
+            if (!j_cmd.is_object()) {
+                g_critical("TFlowCtrlCli: Bad incoming message format");
+                return 0;   // Bad format
+            }
+
+            // Split command object into "name" and "params"
+            const json11::Json::object &cmd_params = j_cmd.object_items();
+            cli.sendMsgToCtrl(cmd_suffix.append(cmd_params.begin()->first.c_str()).c_str(), cmd_params);   
+        }
     }
 
     // Does Mongoose provide multiple parrallel requests at a time?

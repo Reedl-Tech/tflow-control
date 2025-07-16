@@ -3,7 +3,7 @@
 #include <thread>
 #include <signal.h>
 
-#include "tflow-control.h"
+#include "tflow-control.hpp"
 
 TFlowControl *gp_app;
 

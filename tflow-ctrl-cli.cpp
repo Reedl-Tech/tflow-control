@@ -8,7 +8,7 @@
 
 #include <json11.hpp>
 
-#include "tflow-control.h"
+#include "tflow-control.hpp"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
@@ -35,7 +35,7 @@ static double diff_timespec_msec(
     return d_tp.tv_sec * 1000 + (double)d_tp.tv_nsec / (1000 * 1000);
 }
 
-TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name)
+TFlowCtrlCli::TFlowCtrlCli(TFlowControl* _app, const char *_srv_name) 
 {
     app = _app;
 
@@ -92,33 +92,141 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
         return 0;
     }
 
-    const json11::Json ctrl_resp_err = j_in_msg["err"];
-    const json11::Json ctrl_resp_err_msg = j_in_msg["err_msg"];
+    const json11::Json &ctrl_resp_err = j_in_msg["err"];
+    const json11::Json &ctrl_resp_err_msg = j_in_msg["err_msg"];
 
     if (ctrl_resp_err.is_number()) {
         // TFlowCtrlServer Report an error 
         // { "cmd" : { "err" : <code> , "err_msg", "some error text" } }
 
-        app->tflow_mg->sendMsgToMg(json11::Json::object({ {
-                ctrl_resp_cmd.string_value().c_str(),
-                json11::Json::object({
-                    { "err", ctrl_resp_err.int_value() },
-                    { "err_msg", ctrl_resp_err_msg.is_string() ? 
-                        ctrl_resp_err_msg.string_value() : "unknown" } })
+        app->tflow_mg->sendMsgToMg(json11::Json::object({ 
+                {
+                    ctrl_resp_cmd.string_value().c_str(),
+                    json11::Json::object({
+                        { "err", ctrl_resp_err.int_value() },
+                        { "err_msg", ctrl_resp_err_msg.is_string() ?
+                            ctrl_resp_err_msg.string_value() : "unknown" } })
                 } })
         );
         return 0;
     }
-    else {
-        // All good - repack as {"cmd" : { params } }
-        const json11::Json ctrl_resp_player_params = j_in_msg["params"];
-        if (ctrl_resp_player_params.is_object()) {
 
-            app->tflow_mg->sendMsgToMg(json11::Json::object({ {
-                ctrl_resp_cmd.string_value().c_str(),
-                    ctrl_resp_player_params } } ));
+    // All good - repack as { "module"  : { "cmd" : { params } } }
+    const json11::Json &ctrl_resp_params = j_in_msg["params"];
+    if (!ctrl_resp_params.is_object()) {
+        return 0;   // Bad format from TFlow Module - do nothing.
+    }
+
+    const std::string &cmd_name = ctrl_resp_cmd.string_value();
+    int last_config_id = -1;
+
+    // TODO: Q: ? Direct action via reference or via parent's callback?
+    // Steal config_id from "confige" and "ui_sign" commands
+    if (0 == strcmp(cmd_name.c_str(), "config") ||
+        0 == strcmp(cmd_name.c_str(), "config_streamer") ||
+        0 == strcmp(cmd_name.c_str(), "config_recorder") ||
+        0 == strcmp(cmd_name.c_str(), "ui_sign")) {
+            
+        const json11::Json &j_config_id = ctrl_resp_params["config_id"];
+        if (j_config_id.is_number()) {
+            last_config_id = j_config_id.int_value();
         }
     }
+
+#if 0
+    // Call parent's callback
+    ctrl_onRespMsg(this, cmd_name.c_str(), ctrl_resp_params);
+#if CODE_BROWSER
+    TFlowControl::onCliRespMsg(resp, ctrl_resp_params);
+#endif
+#endif
+    if (0 == strcmp(srv_name.c_str(), "Capture")) {
+
+        // For messages from Capture and Process repack as in the following:
+        // From TFlowCapture : {"cmd" : "config" , "dir": "request", "params" : { _params_ }} }						
+        // TO WEB UI  : {"capture" : { "config" : { _params_ } } }						
+        const json11::Json::object j_resp_cmd({
+            { cmd_name, ctrl_resp_params } });      // For ex.: { "config" : { _params_ }
+
+        const json11::Json::object j_resp({                            // For ex.: {"capture" : { "config" : { _params_ } } } 
+            { "capture", j_resp_cmd } });
+
+        // Add config ID to parent's map
+        if (last_config_id >= 0) {
+            auto res = app->config_ids.insert_or_assign("capture", last_config_id);
+        }
+
+        app->tflow_mg->sendMsgToMg(j_resp);
+    } 
+    else if (0 == strcmp(srv_name.c_str(), "Process")) {
+
+        if ( 0 == strcmp("player", cmd_name.c_str()) || 
+             0 == strcmp("player_dir", cmd_name.c_str()) ) {
+
+            // Mimic player as a standalone module, but not part of Process
+            const json11::Json::object j_resp({ 
+                { cmd_name.c_str(), ctrl_resp_params } }); 
+
+            app->tflow_mg->sendMsgToMg(j_resp);    // For ex.: {"player" : { _params_ } }  
+        }
+        else {
+            const json11::Json::object j_resp_cmd({
+                { ctrl_resp_cmd.string_value(), ctrl_resp_params } });      // For ex.: { "config" : { _params_ }
+
+            const json11::Json::object j_resp({ 
+                { "mvision", j_resp_cmd } });                         // For ex.: {"mvision" : { "config" : { _params_ } } } 
+
+            // Add config ID to parent's map
+            if (last_config_id >= 0) {
+                app->config_ids.insert_or_assign("mvision", last_config_id);
+            }
+
+            app->tflow_mg->sendMsgToMg(j_resp);
+        }
+    } 
+    else if (0 == strcmp(srv_name.c_str(), "VStream")) {
+
+        // From TFlowVStream : {"cmd" : "streaming_config" , "dir": "request", "params" : { _params_ }} }						
+        // TO WEB UI  : {"streaming" : { "config" : { _params_ } } }						
+
+        if (0 == strncmp("recording_", cmd_name.c_str(), 10)) {
+            std::string cmd_name_stripped(cmd_name.c_str() + 10);
+
+            const json11::Json::object j_resp_cmd({
+                { cmd_name_stripped.c_str(), ctrl_resp_params } });      // For ex.: { "config" : { _params_ }
+
+            const json11::Json::object j_resp({
+                { "recording", j_resp_cmd } });                          // For ex.: {"recording" : { "config" : { _params_ } } } 
+
+            // Add config ID to parent's map
+            if (last_config_id >= 0) {
+                app->config_ids.insert_or_assign("recording", last_config_id);
+            }
+
+            app->tflow_mg->sendMsgToMg(j_resp);
+        }
+        else if (0 == strncmp("streaming_", cmd_name.c_str(), 10)) {
+            std::string cmd_name_stripped(cmd_name.c_str() + 10);
+
+            const json11::Json::object j_resp_cmd({
+                { cmd_name_stripped.c_str(), ctrl_resp_params } });      // For ex.: { "config" : { _params_ }
+
+            const json11::Json::object j_resp({
+                { "streaming", j_resp_cmd } });                          // For ex.: {"streaming" : { "config" : { _params_ } } } 
+
+            // Add config ID to parent's map
+            if (last_config_id >= 0) {
+                app->config_ids.insert_or_assign("streaming", last_config_id);
+            }
+
+            app->tflow_mg->sendMsgToMg(j_resp);
+        }
+
+    }
+    //app->tflow_mg->sendMsgToMg(json11::Json::object({ {
+    //    ctrl_resp_cmd.string_value().c_str(),
+    //        ctrl_resp_player_params } } ));
+
     return 0;
 }
 
@@ -199,7 +307,7 @@ int TFlowCtrlCli::sendMsgToCtrl(const char *cmd, const json11::Json::object &j_p
         last_idle_check_tp = { 0 }; // aka Idle loop kick - TODO: rework for "connect to idle once"
         return -1;
     }
-    g_warning("TFlowCtrlCli: [%s] ->> [%s]  %s", 
+    g_info("TFlowCtrlCli: [%s] ->> [%s]  %s", 
         my_cli_name.c_str(), srv_name.c_str(), cmd);
 
     clock_gettime(CLOCK_MONOTONIC, &last_send_tp);
@@ -279,7 +387,7 @@ int TFlowCtrlCli::Connect()
         return -1;
     }
 
-    g_warning("TFlowCtrlCli: Connected to the Server [%s]", srv_name.c_str());
+    g_info("TFlowCtrlCli: Connected to the Server [%s]", srv_name.c_str());
 
     /* Assign g_source on the socket */
     sck_gsfuncs.dispatch = tflow_ctrl_cli_dispatch;

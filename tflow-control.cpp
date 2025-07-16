@@ -6,7 +6,7 @@
 #include <glib-unix.h>
 #include <json11.hpp>
 
-#include "tflow-control.h"
+#include "tflow-control.hpp"
 
 #define  IDLE_INTERVAL_MSEC 100
 
@@ -22,7 +22,6 @@ TFlowControl::TFlowControl()
     tflow_ctrl_clis.emplace_back(this, (const char*)"Capture"); 
     tflow_ctrl_clis.emplace_back(this, (const char*)"Process");
     tflow_ctrl_clis.emplace_back(this, (const char*)"VStream");
-    
 
     tflow_mg = new TFlowMg(this);
 }
@@ -70,3 +69,12 @@ void TFlowControl::AttachIdle()
 
     return;
 }
+
+#if 0
+void TFlowControl::onCliRespMsg(TFlowCtrlCli *cli, const char* resp_name, 
+    const json11::Json& ctrl_resp_params)
+{
+    
+
+}
+#endif
