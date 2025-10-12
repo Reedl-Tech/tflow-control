@@ -70,6 +70,28 @@ void TFlowControl::AttachIdle()
     return;
 }
 
+void TFlowControl::saveCfgID(const char* module_name, int new_id)
+{
+    // Add config ID to parent's map
+    if (new_id >= 0) {
+        int last_known_id = -1;
+        auto it_cfg_id = config_ids.find(module_name);
+        if (it_cfg_id != config_ids.end()) {
+            last_known_id = it_cfg_id->second;
+        }
+        if (last_known_id > new_id) {
+            // Newly received configuration id is in past. 
+            // Most probably the module was restarted.
+            // Save new ID as -1 to request full configuration update from the
+            // WEB application
+            new_id = -1;
+        }
+        config_ids.insert_or_assign(module_name, new_id);
+    }
+
+}
+
+
 #if 0
 void TFlowControl::onCliRespMsg(TFlowCtrlCli *cli, const char* resp_name, 
     const json11::Json& ctrl_resp_params)

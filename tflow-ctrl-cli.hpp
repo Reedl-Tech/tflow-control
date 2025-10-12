@@ -55,6 +55,7 @@ private:
     struct timespec last_send_tp = { 0 };
 
     int onCtrlMsgParse(const char* msg);
+    void onCtrlMsgParseSaveCfgID(const char* msg, int new_id);
 
     // Parent module callback;
     std::function<void(TFlowCtrlCli *cli, const char *cmd, 

@@ -1,17 +1,28 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='6.1-Mickledore|ARM64'">
     <RemoteDebuggingTarget>4573005;192.168.2.2 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
     <RemoteDebuggerCommand>/home/root/tflow-control</RemoteDebuggerCommand>
     <RemoteDebuggerWorkingDirectory>/home/root/</RemoteDebuggerWorkingDirectory>
     <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
-    <RemoteTarget>-1917410861;192.168.1.101 (username=, port=22, authentication=PrivateKey)</RemoteTarget>
+    <RemoteTarget>-1293454544;192.168.1.102 (username=, port=22, authentication=Password)</RemoteTarget>
     <AdditionalDebuggerCommands>set substitute-path /usr/src/debug/tflow-control/1.0-r0 /home/av/compulab-nxp-bsp/build-ucm-imx8m-plus/workspace/sources/tflow-control</AdditionalDebuggerCommands>
     <RemoteGDBPath>C:\MyWorks\LKD\tflow-sdk\gdb\aarch64-none-elf-gdb.exe</RemoteGDBPath>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <RemoteDebuggingTarget>4573005;192.168.2.2 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='6.6-Scarthgap|ARM64'">
+    <RemoteDebuggingTarget>359070302;192.168.2.3 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
+    <RemoteDebuggerCommand>/root/tflow-control</RemoteDebuggerCommand>
+    <RemoteDebuggerWorkingDirectory>/root/</RemoteDebuggerWorkingDirectory>
+    <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
+    <RemoteTarget>-706648530;192.168.1.100 (username=, port=22, authentication=Password)</RemoteTarget>
+    <AdditionalDebuggerCommands>set substitute-path /usr/src/debug/tflow-control/1.0  /home/av/8dev-Scarthgap/compulab-nxp-bsp/build-ucm-imx8m-plus-bubo/workspace/sources/tflow-control</AdditionalDebuggerCommands>
+    <RemoteGDBPath>C:\MyWorks\LKD\tflow-sdk\gdb\aarch64-none-elf-gdb.exe</RemoteGDBPath>
+    <DebugChildProcesses>true</DebugChildProcesses>
+    <EnablePrettyPrinting>false</EnablePrettyPrinting>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
 </Project>

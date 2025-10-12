@@ -91,19 +91,6 @@ static size_t print_int_arr(void (*out)(char, void *), void *ptr, va_list *ap) {
   return len;
 }
 
-static void handle_stats_get(struct mg_connection *c) {
-  int points[] = {21, 22, 22, 19, 18, 20, 23, 23, 22, 22, 22, 23, 22};
-
-  // Send commands to TFlowCtrl 
-  // Wait for reply with timeout
-
-  mg_http_reply(c, 200, s_json_header, "{%m:%d,%m:%d,%m:[%M]}\n",
-                MG_ESC("temperature"), 11,  //
-                MG_ESC("humidity"), 22,     //
-                MG_ESC("points"), print_int_arr,
-                sizeof(points) / sizeof(points[0]), points);
-}
-
 void TFlowMg::_wait_and_reply_tflow_response(struct mg_connection* c, struct mg_data* my_data)
 {
     ssize_t bytes_flush;
@@ -151,11 +138,24 @@ void TFlowMg::_wait_and_reply_tflow_response(struct mg_connection* c, struct mg_
 
 void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
 {
+    // TODO: Cleanup. Remove WS socket related stuff
     struct mg_data *my_data = (struct mg_data* )c->fn_data;
 
     if (ev == MG_EV_OPEN && c->is_listening) {
         // Connection created
     }
+    if (ev == MG_EV_ACCEPT) {
+        size_t cert_len = 0;
+        size_t key_len = 0;
+        struct mg_tls_opts opts = {
+            .cert = mg_file_read(&mg_fs_posix, "/home/root/cert/server.crt", &cert_len),
+            .key  = mg_file_read(&mg_fs_posix, "/home/root/cert/server.key", &key_len),
+            // .ca   = mg_file_read(&mg_fs_posix, "/home/root/cert/ca.crt", NULL)
+        };
+        opts.cert.len = cert_len;
+        opts.key.len = key_len;
+        mg_tls_init(c, &opts);
+  }
     else if (ev == MG_EV_HTTP_MSG) {
         struct mg_http_message* hm = (struct mg_http_message*)ev_data;
         struct user *u = authenticate(hm);
@@ -173,9 +173,6 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
             handle_logout(c);
         }
 #endif
-        else if (mg_http_match_uri(hm, "/api/stats/get")) {
-            handle_stats_get(c);
-        }
         else if ( mg_http_match_uri(hm, "/api") ) {
             
             int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
@@ -421,7 +418,7 @@ int TFlowMg::onMsgFromMg()
         // Split command object into "name" and "params"
         const json11::Json::object &cmd_params = j_cmd.object_items();
 
-        cli.sendMsgToCtrl(cmd_name, cmd_params);   
+        cli.sendMsgToCtrl(cmd_name, cmd_params);
     } 
 
     if (http_req_capture.is_object()) {

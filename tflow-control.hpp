@@ -30,6 +30,7 @@ public:
     std::vector<TFlowCtrlCli> tflow_ctrl_clis; 
     TFlowMg *tflow_mg;
 
+    void saveCfgID(const char* module_name, int new_id);
     std::unordered_map<std::string, int> config_ids;
 private:
 

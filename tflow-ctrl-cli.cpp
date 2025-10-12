@@ -118,18 +118,19 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
     }
 
     const std::string &cmd_name = ctrl_resp_cmd.string_value();
-    int last_config_id = -1;
+    int received_config_id = -1;
 
     // TODO: Q: ? Direct action via reference or via parent's callback?
-    // Steal config_id from "confige" and "ui_sign" commands
-    if (0 == strcmp(cmd_name.c_str(), "config") ||
+    // Steal config_id from "config" and "ui_sign" commands
+    if (0 == strcmp(cmd_name.c_str(), "signature")       ||
+        0 == strcmp(cmd_name.c_str(), "config")          ||
         0 == strcmp(cmd_name.c_str(), "config_streamer") ||
         0 == strcmp(cmd_name.c_str(), "config_recorder") ||
         0 == strcmp(cmd_name.c_str(), "ui_sign")) {
             
         const json11::Json &j_config_id = ctrl_resp_params["config_id"];
         if (j_config_id.is_number()) {
-            last_config_id = j_config_id.int_value();
+            received_config_id = j_config_id.int_value();
         }
     }
 
@@ -151,10 +152,7 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
         const json11::Json::object j_resp({                            // For ex.: {"capture" : { "config" : { _params_ } } } 
             { "capture", j_resp_cmd } });
 
-        // Add config ID to parent's map
-        if (last_config_id >= 0) {
-            auto res = app->config_ids.insert_or_assign("capture", last_config_id);
-        }
+        app->saveCfgID("capture", received_config_id);  
 
         app->tflow_mg->sendMsgToMg(j_resp);
     } 
@@ -176,10 +174,7 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
             const json11::Json::object j_resp({ 
                 { "mvision", j_resp_cmd } });                         // For ex.: {"mvision" : { "config" : { _params_ } } } 
 
-            // Add config ID to parent's map
-            if (last_config_id >= 0) {
-                app->config_ids.insert_or_assign("mvision", last_config_id);
-            }
+            app->saveCfgID("mvision", received_config_id);  
 
             app->tflow_mg->sendMsgToMg(j_resp);
         }
@@ -198,10 +193,7 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
             const json11::Json::object j_resp({
                 { "recording", j_resp_cmd } });                          // For ex.: {"recording" : { "config" : { _params_ } } } 
 
-            // Add config ID to parent's map
-            if (last_config_id >= 0) {
-                app->config_ids.insert_or_assign("recording", last_config_id);
-            }
+            app->saveCfgID("recording", received_config_id);  
 
             app->tflow_mg->sendMsgToMg(j_resp);
         }
@@ -214,10 +206,7 @@ int TFlowCtrlCli::onCtrlMsgParse(const char *ctrl_in_msg)
             const json11::Json::object j_resp({
                 { "streaming", j_resp_cmd } });                          // For ex.: {"streaming" : { "config" : { _params_ } } } 
 
-            // Add config ID to parent's map
-            if (last_config_id >= 0) {
-                app->config_ids.insert_or_assign("streaming", last_config_id);
-            }
+            app->saveCfgID("streaming", received_config_id);  
 
             app->tflow_mg->sendMsgToMg(j_resp);
         }
