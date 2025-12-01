@@ -259,7 +259,7 @@ int TFlowMg::onRequest(const json11::Json &j_msg)
             if (it_cfg_id != app->config_ids.end()) {
                 j_mod_params.emplace("config_id", it_cfg_id->second);
             }
-            j_modules.emplace( "recording", j_mod_params);
+            j_modules.emplace("recording", j_mod_params);
 
             it_cfg_id = app->config_ids.find("streaming");
             if (it_cfg_id != app->config_ids.end()) {
@@ -408,7 +408,7 @@ int TFlowMg::onMsgFromMg()
             http_req_player_dir.is_object() ? http_req_player_dir: 
             json11::Json();
 
-        auto del_me = j_cmd.dump();
+        // auto del_me = j_cmd.dump();
 
         const char *cmd_name = 
             http_req_player.is_object() ? "player" :
@@ -450,7 +450,7 @@ int TFlowMg::onMsgFromMg()
         const json11::Json &j_cmd = http_req_capture.object_items().begin()->second;
         const std::string &cmd_name = http_req_capture.object_items().begin()->first;
 
-        auto del_me = j_cmd.dump();
+        //auto del_me = j_cmd.dump();
 
         // Command parametr(s) are always object
         if (!j_cmd.is_object()) {
@@ -486,7 +486,7 @@ int TFlowMg::onMsgFromMg()
             return 0;
         }
 
-        const json11::Json &j_cmd = 
+        const json11::Json &j_http_req = 
             http_req_streaming.is_object() ? http_req_streaming :
             http_req_recording.is_object() ? http_req_recording : 
             json11::Json();
@@ -496,24 +496,26 @@ int TFlowMg::onMsgFromMg()
             http_req_recording.is_object() ? "recording_" :
             std::string();
 
-        if (http_req_streaming.object_items().empty()) {
-            // Empty request - the module will respond with controls
-            json11::Json j_dummy;
-            cli.sendMsgToCtrl(cmd_suffix.append("controls").c_str(), j_dummy.object_items());
-        }
-        else {
-            // Strip modules name. For ex.: { "config" : {  params } }
-            const json11::Json &j_cmd = http_req_streaming.object_items().begin()->second;
-            // Command parametr(s) are always object
-            if (!j_cmd.is_object()) {
-                g_critical("TFlowCtrlCli: Bad incoming message format");
-                return 0;   // Bad format
-            }
 
-            // Split command object into "name" and "params"
-            const json11::Json::object &cmd_params = j_cmd.object_items();
-            cli.sendMsgToCtrl(cmd_suffix.append(cmd_params.begin()->first.c_str()).c_str(), cmd_params);   
+        if (j_http_req.is_object()) {
+            if (j_http_req.object_items().empty()) {
+                g_critical("TFlowCtrlCli: Bad incoming message format");
+                return 0;
+            }
         }
+
+        // Command parametr(s) are always object
+        const json11::Json &j_cmd = j_http_req.object_items().begin()->second;
+        if (!j_cmd.is_object()) {
+            g_critical("TFlowCtrlCli: Bad incoming message format");
+            return 0;   // Bad format
+        }
+
+        auto del_me = j_cmd.dump();
+
+        // Split command object into "name" and "params"
+        const json11::Json::object &cmd_params = j_cmd.object_items();
+        cli.sendMsgToCtrl(cmd_suffix.append(j_http_req.object_items().begin()->first.c_str()).c_str(), cmd_params);   
     }
 
     // Does Mongoose provide multiple parrallel requests at a time?

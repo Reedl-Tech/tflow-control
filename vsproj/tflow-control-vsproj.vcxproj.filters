@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="..\mongoose.c" />
+    <ClCompile Include="..\tflow-control.cpp" />
+    <ClCompile Include="..\tflow-ctrl-cli.cpp" />
+    <ClCompile Include="..\tflow-mg.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\mongoose.h" />
+    <ClInclude Include="..\tflow-common.hpp" />
+    <ClInclude Include="..\tflow-control.hpp" />
+    <ClInclude Include="..\tflow-ctrl-cli.hpp" />
+    <ClInclude Include="..\tflow-mg.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{bec2f256-8358-436d-a682-db40015c5c1f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="build-6.1.sh" />
+    <None Include="build-8dev-6.6.sh" />
+  </ItemGroup>
+</Project>

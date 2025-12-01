@@ -143,7 +143,7 @@
       <Command>pscp $(OutDir)tflow-control root@192.168.2.3:/root</Command>
     </PostBuildEvent>
     <ClCompile>
-      <CppLanguageStandard>c++17</CppLanguageStandard>
+      <CppLanguageStandard>c++20</CppLanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

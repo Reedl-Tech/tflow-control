@@ -22,6 +22,9 @@ TFlowControl::TFlowControl()
     tflow_ctrl_clis.emplace_back(this, (const char*)"Capture"); 
     tflow_ctrl_clis.emplace_back(this, (const char*)"Process");
     tflow_ctrl_clis.emplace_back(this, (const char*)"VStream");
+#if CODE_BROWSE
+    TFlowCtrlCli;
+#endif 
 
     tflow_mg = new TFlowMg(this);
 }

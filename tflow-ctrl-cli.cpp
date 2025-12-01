@@ -376,7 +376,7 @@ int TFlowCtrlCli::Connect()
         return -1;
     }
 
-    g_info("TFlowCtrlCli: Connected to the Server [%s]", srv_name.c_str());
+    g_info("TFlowCtrlCli: Connected to the server [%s]", srv_name.c_str());
 
     /* Assign g_source on the socket */
     sck_gsfuncs.dispatch = tflow_ctrl_cli_dispatch;
