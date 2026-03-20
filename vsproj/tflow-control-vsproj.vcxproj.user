@@ -11,12 +11,12 @@
     <RemoteGDBPath>C:\MyWorks\LKD\tflow-sdk\gdb\aarch64-none-elf-gdb.exe</RemoteGDBPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='6.6-Scarthgap|ARM64'">
-    <RemoteDebuggingTarget>359070302;192.168.2.3 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
+    <RemoteDebuggingTarget>1053516975;192.168.2.77 (username=, port=22, authentication=Password)</RemoteDebuggingTarget>
     <RemoteDebuggerCommand>/root/tflow-control</RemoteDebuggerCommand>
     <RemoteDebuggerWorkingDirectory>/root/</RemoteDebuggerWorkingDirectory>
     <RemoteDebuggingMode>gdbserver</RemoteDebuggingMode>
     <DebuggerFlavor>LinuxDebugger</DebuggerFlavor>
-    <RemoteTarget>-706648530;192.168.1.100 (username=, port=22, authentication=Password)</RemoteTarget>
+    <RemoteTarget>-1880260558;192.168.1.104 (username=, port=22, authentication=Password)</RemoteTarget>
     <AdditionalDebuggerCommands>set substitute-path /usr/src/debug/tflow-control/1.0  /home/av/8dev-Scarthgap/compulab-nxp-bsp/build-ucm-imx8m-plus-bubo/workspace/sources/tflow-control</AdditionalDebuggerCommands>
     <RemoteGDBPath>C:\MyWorks\LKD\tflow-sdk\gdb\aarch64-none-elf-gdb.exe</RemoteGDBPath>
     <DebugChildProcesses>true</DebugChildProcesses>

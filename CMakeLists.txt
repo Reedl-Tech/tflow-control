@@ -17,6 +17,8 @@ find_package(PkgConfig REQUIRED)
 # Add source to this project's executable.
 add_executable (${PROJECT_NAME}
     "main.cpp"
+    "tflow-glib.hpp"
+    "tflow-build-cfg.hpp"
     "tflow-common.hpp"
     "tflow-control.cpp"
     "tflow-control.hpp"

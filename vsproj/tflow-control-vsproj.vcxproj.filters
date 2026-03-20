@@ -13,6 +13,8 @@
     <ClInclude Include="..\tflow-control.hpp" />
     <ClInclude Include="..\tflow-ctrl-cli.hpp" />
     <ClInclude Include="..\tflow-mg.hpp" />
+    <ClInclude Include="..\tflow-build-cfg.hpp" />
+    <ClInclude Include="..\tflow-glib.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\CMakeLists.txt" />

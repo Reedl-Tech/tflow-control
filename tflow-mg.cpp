@@ -1,11 +1,20 @@
+#include "tflow-build-cfg.hpp"
+
+#if _WIN32
+#include <WinSock2.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <fileapi.h>
+#endif
+
+#include <cstddef>
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
 
-#include <glib-unix.h>
-
 #include <json11.hpp>
 
+#include "tflow-glib.hpp"
 #include "tflow-control.hpp"
 #include "tflow-mg.hpp"
 
@@ -13,18 +22,8 @@ struct user {
   const char *name, *pass, *access_token;
 };
 
-// Settings
-struct settings {
-  bool log_enabled;
-  int log_level;
-  long brightness;
-  char *device_name;
-};
-
 static char tflow_mg_in[1024 * 1024];      // Buffer for messages from TFlowMG to MG
 static char tflow_mg_out[1024 * 1024];      // Buffer for messages from MG to TFlowMG 
-
-static struct settings s_settings = {true, 1, 57, NULL};
 
 static const char *s_json_header =
     "Content-Type: application/json\r\n"
@@ -155,7 +154,7 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
         opts.cert.len = cert_len;
         opts.key.len = key_len;
         mg_tls_init(c, &opts);
-  }
+    }
     else if (ev == MG_EV_HTTP_MSG) {
         struct mg_http_message* hm = (struct mg_http_message*)ev_data;
         struct user *u = authenticate(hm);
@@ -164,15 +163,6 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
             mg_ws_upgrade(c, hm, NULL);  // Upgrade HTTP to Websocket
             c->data[0] = 'W';            // Set some unique mark on a connection
         }
-#if 0
-        else if (mg_http_match_uri(hm, "/api/#") && u == NULL) {
-            mg_http_reply(c, 403, "", "Not Authorised\n");
-        } else if (mg_http_match_uri(hm, "/api/login")) {
-            handle_login(c, u);
-        } else if (mg_http_match_uri(hm, "/api/logout")) {
-            handle_logout(c);
-        }
-#endif
         else if ( mg_http_match_uri(hm, "/api") ) {
             
             int res = write(my_data->wr_fd, hm->body.ptr, hm->body.len);
@@ -196,16 +186,6 @@ void TFlowMg::_on_msg(struct mg_connection* c, int ev, void* ev_data)
         struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
         mg_ws_send(c, wm->data.ptr, wm->data.len, WEBSOCKET_OP_TEXT);
         mg_iobuf_del(&c->recv, 0, c->recv.len);
-#if 0
-        mg_rpc_add(&s_rpc_head, mg_str("rpc.list"), mg_rpc_list, &s_rpc_head);
-
-        struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
-        struct mg_iobuf io = { 0, 0, 0, 512 };
-        struct mg_rpc_req r = { &s_rpc_head, 0, mg_pfn_iobuf, &io, 0, wm->data };
-        mg_rpc_process(&r);
-        if (io.buf) mg_ws_send(c, (char*)io.buf, io.len, WEBSOCKET_OP_TEXT);
-        mg_iobuf_free(&io);
-#endif
     }
     else if (ev == MG_EV_WAKEUP) {
         struct mg_str* data = (struct mg_str*)ev_data;

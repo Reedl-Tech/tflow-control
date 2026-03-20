@@ -49,9 +49,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\mongoose.h" />
+    <ClInclude Include="..\tflow-build-cfg.hpp" />
     <ClInclude Include="..\tflow-common.hpp" />
     <ClInclude Include="..\tflow-control.hpp" />
     <ClInclude Include="..\tflow-ctrl-cli.hpp" />
+    <ClInclude Include="..\tflow-glib.hpp" />
     <ClInclude Include="..\tflow-mg.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -140,7 +142,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='6.6-Scarthgap|ARM64'">
     <PostBuildEvent>
-      <Command>pscp $(OutDir)tflow-control root@192.168.2.3:/root</Command>
+      <Command>pscp $(OutDir)tflow-control root@192.168.2.77:/root</Command>
     </PostBuildEvent>
     <ClCompile>
       <CppLanguageStandard>c++20</CppLanguageStandard>

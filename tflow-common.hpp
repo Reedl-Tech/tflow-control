@@ -1,4 +1,5 @@
 #pragma once
+
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
 class Flag {
